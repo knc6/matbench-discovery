@@ -1,6 +1,5 @@
 # %%
 import os
-import sys
 from collections.abc import Callable
 
 import crystal_toolkit.components as ctc
@@ -14,6 +13,7 @@ from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 from m3gnet.models import Relaxer as M3gnetRelaxer
 from pymatgen.core import Lattice, Structure
+from pymatviz import IS_IPYTHON
 from pymatviz.enums import Key
 
 from matbench_discovery.data import df_wbm
@@ -124,7 +124,6 @@ def plot_energy_and_forces(
 
 app = Dash(prevent_initial_callbacks=True, assets_folder=SETTINGS.ASSETS_PATH)
 
-
 app_div = html.Div(
     [
         html.H1("Structure Relaxation Trajectory", style={"fontSize": "2em"}),
@@ -176,7 +175,19 @@ for name, df, traj in (
         e_col: str,
         force_col: str,
     ) -> Callable[[int], tuple[Structure, go.Figure]]:
-        """Factory function to create update callback for each structure component."""
+        """Factory function to create update callback for each structure component.
+
+        Args:
+            trajectory (TrajectoryObserver): Contains relaxation trajectory.
+            df_traj (pd.DataFrame): DataFrame with energy and force data.
+            material_id (str): Material ID.
+            init_struct (Structure): Initial structure.
+            e_col (str): Column name for energy data.
+            force_col (str): Column name for force data.
+
+        Returns:
+            Callable[[int], tuple[Structure, go.Figure]]: Update callback.
+        """
 
         def update_structure(step: int) -> tuple[Structure, go.Figure]:
             """Update the structure displayed in the StructureMoleculeComponent and the
@@ -207,8 +218,4 @@ for name, df, traj in (
 
 app.layout = app_div
 ctc.register_crystal_toolkit(app=app, layout=app.layout)
-
-# https://stackoverflow.com/a/74918941
-is_jupyter = "ipykernel" in sys.modules
-
-app.run(port=8000, use_reloader=not is_jupyter)
+app.run(use_reloader=not IS_IPYTHON)

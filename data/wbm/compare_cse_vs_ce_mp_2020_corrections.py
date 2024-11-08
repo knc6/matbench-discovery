@@ -7,20 +7,20 @@ ComputedStructureEntry, not ComputedEntry when applying energy corrections.
 import gzip
 import json
 
+import matplotlib.pyplot as plt
 import pandas as pd
+import pymatviz as pmv
 from pymatgen.entries.compatibility import (
     MaterialsProject2020Compatibility,
     MaterialsProjectCompatibility,
 )
 from pymatgen.entries.computed_entries import ComputedEntry, ComputedStructureEntry
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 from tqdm import tqdm
 
 from matbench_discovery import ROOT, today
 from matbench_discovery.data import DataFiles, df_wbm
 from matbench_discovery.energy import get_e_form_per_atom
-from matbench_discovery.plots import plt
 
 df_cse = pd.read_json(DataFiles.wbm_computed_structure_entries.path).set_index(
     Key.mat_id
@@ -96,14 +96,14 @@ for key, df_anion in df_ce_ne_cse.groupby("anion"):
 
 ax.axline((0, 0), slope=1, color="gray", linestyle="dashed", zorder=-1)
 
-save_fig(ax, f"{ROOT}/tmp/{today}-ce-vs-cse-corrections-outliers.pdf")
+pmv.save_fig(ax, f"{ROOT}/tmp/{today}-ce-vs-cse-corrections-outliers.pdf")
 
 
 # %%
 ax = plt.gca()
 for key, df_anion in df_ce_ne_cse.groupby("anion"):
     ax = df_anion.plot.scatter(
-        ax=locals().get("ax"),
+        ax=ax,
         x="e_form_per_atom_mp2020_from_cse",
         y="e_form_per_atom_mp2020_from_ce",
         label=f"{key} ({len(df_anion):,})",
@@ -117,7 +117,7 @@ ax.axline((0, 0), slope=1, color="gray", linestyle="dashed", zorder=-1)
 # insight: all materials for which ComputedEntry and ComputedStructureEntry give
 # different formation energies are oxides or sulfides for which MP 2020 compat takes
 # into account structural information to make more accurate corrections.
-save_fig(ax, f"{ROOT}/tmp/{today}-ce-vs-cse-e-form-outliers.pdf")
+pmv.save_fig(ax, f"{ROOT}/tmp/{today}-ce-vs-cse-e-form-outliers.pdf")
 
 
 # %% below code resulted in
@@ -131,7 +131,7 @@ cse_mp2020, cse_legacy = cses[idx].copy(), cses[idx].copy()
 ce_mp2020, ce_legacy = ces[idx].copy(), ces[idx].copy()
 
 
-with gzip.open(f"{ROOT}/tmp/cse-wbm-2-34803.json.zip", "w") as file:
+with gzip.open(f"{ROOT}/tmp/cse-wbm-2-34803.json.zip", mode="w") as file:
     file.write(cse_mp2020.to_json().encode("utf-8"))
 
 with gzip.open(f"{ROOT}/tmp/cse-wbm-2-34803.json.zip") as file:

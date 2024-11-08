@@ -16,7 +16,7 @@ import requests
 from requests.exceptions import HTTPError
 from tqdm import tqdm
 
-from matbench_discovery import DATA_DIR, FIGSHARE_DIR, ROOT
+from matbench_discovery import DATA_DIR, PKG_DIR, ROOT
 from matbench_discovery.data import DataFiles
 
 __author__ = "Janosh Riebesell"
@@ -32,7 +32,20 @@ BASE_URL = "https://api.figshare.com/v2"
 def make_request(
     method: str, url: str, *, data: Any = None, binary: bool = False
 ) -> Any:
-    """Make a token-authorized HTTP request to the Figshare API."""
+    """Make a token-authorized HTTP request to the Figshare API.
+
+    Args:
+        method (str): HTTP method (GET, POST, PUT, DELETE).
+        url (str): URL to send the request to.
+        data (Any, optional): Data to send in the request body. Defaults to None.
+        binary (bool, optional): Whether the data is binary. Defaults to False.
+
+    Returns:
+        Any: JSON response data or binary data.
+
+    Raises:
+        HTTPError: If the request fails. Error will contain the response body.
+    """
     headers = {"Authorization": f"token {TOKEN}"}
     if data is not None and not binary:
         data = json.dumps(data)
@@ -43,9 +56,8 @@ def make_request(
             data = json.loads(response.content)
         except ValueError:
             data = response.content
-    except HTTPError as error:
-        print(f"Caught an HTTPError: {error}")
-        print(f"Body:\n{response.content.decode()}")
+    except HTTPError as exc:
+        exc.add_note(f"body={response.content.decode()}")
         raise
 
     return data
@@ -155,7 +167,7 @@ def main(pyproject: dict[str, Any], urls_json_path: str) -> int:
                 "download": "https://figshare.com/ndownloader/files/41619375",
             },
         }
-        with open(urls_json_path, "w") as file:
+        with open(urls_json_path, mode="w") as file:
             json.dump(figshare_urls, file)
     except Exception as exc:  # prompt to delete article if something went wrong
         if file_path := str(locals().get("file_path", "")):
@@ -173,7 +185,7 @@ if __name__ == "__main__":
     with open(f"{ROOT}/pyproject.toml", "rb") as toml_file:
         pyproject = tomllib.load(toml_file)["project"]
 
-    figshare_urls_json_path = f"{FIGSHARE_DIR}/{pyproject['version']}.json"
+    figshare_urls_json_path = f"{PKG_DIR}/figshare/{pyproject['version']}.json"
     if os.path.isfile(figshare_urls_json_path):
         print(
             f"{figshare_urls_json_path!r} already exists, exiting early. Increment the "

@@ -7,6 +7,7 @@ import pytest
 from pymatviz.enums import Key
 from pymatviz.utils import BACKENDS, MATPLOTLIB, PLOTLY
 
+from matbench_discovery.data import load_df_wbm_with_preds
 from matbench_discovery.enums import MbdKey
 from matbench_discovery.plots import (
     Backend,
@@ -16,7 +17,6 @@ from matbench_discovery.plots import (
     plotly_markers,
     rolling_mae_vs_hull_dist,
 )
-from matbench_discovery.preds import load_df_wbm_with_preds
 
 AxLine = Literal["x", "y", "xy", ""]
 models = ["MEGNet", "CGCNN", "Voronoi RF"]
@@ -38,7 +38,7 @@ def test_cumulative_metrics(
     backend: Backend,
     metrics: tuple[str, ...],
 ) -> None:
-    fig, df_metrics = cumulative_metrics(
+    fig, df_cumu_metrics = cumulative_metrics(
         e_above_hull_true=df_wbm[MbdKey.each_true],
         df_preds=df_wbm[models],
         backend=backend,
@@ -47,8 +47,8 @@ def test_cumulative_metrics(
         metrics=metrics,
     )
 
-    assert isinstance(df_metrics, pd.DataFrame)
-    assert list(df_metrics) == [*models, "metric"]
+    assert isinstance(df_cumu_metrics, pd.DataFrame)
+    assert list(df_cumu_metrics) == [*models, "metric"]
 
     if backend == MATPLOTLIB:
         assert isinstance(fig, plt.Figure)

@@ -10,20 +10,18 @@ from importlib.metadata import version
 
 import numpy as np
 import pandas as pd
+import pymatviz as pmv
 import wandb
 from megnet.utils.models import load_model
 from pymatgen.core import Structure
-from pymatviz import density_scatter
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 from sklearn.metrics import r2_score
 from tqdm import tqdm
 
 from matbench_discovery import timestamp, today
-from matbench_discovery.data import DataFiles, df_wbm
+from matbench_discovery.data import DataFiles, Model, df_wbm
 from matbench_discovery.enums import MbdKey, Task
 from matbench_discovery.plots import wandb_scatter
-from matbench_discovery.preds import PredFiles
 from matbench_discovery.slurm import slurm_submit
 
 __author__ = "Janosh Riebesell"
@@ -56,10 +54,10 @@ slurm_array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID", "0"))
 data_path = {
     Task.IS2RE: DataFiles.wbm_initial_structures.path,
     Task.RS2RE: DataFiles.wbm_computed_structure_entries.path,
-    "chgnet_structure": PredFiles.chgnet.path.replace(".csv.gz", ".json.gz"),
-    "m3gnet_structure": PredFiles.m3gnet.path.replace(".csv.gz", ".json.gz"),
+    "chgnet_structure": Model.chgnet.path.replace(".csv.gz", ".json.gz"),
+    "m3gnet_structure": Model.m3gnet.path.replace(".csv.gz", ".json.gz"),
 }[task_type]
-print(f"\nJob started running {timestamp}")
+print(f"\nJob {job_name} started {timestamp}")
 print(f"{data_path=}")
 if MbdKey.e_form_dft not in df_wbm:
     raise KeyError(f"{MbdKey.e_form_dft!s} not in {df_wbm.columns=}")
@@ -130,13 +128,13 @@ if task_type != Task.IS2RE:
 df_megnet.add_suffix(f"_{task_type.lower()}").round(4).to_csv(out_path)
 
 # df_megnet = pd.read_csv(
-#     f"{ROOT}/models/{PredFiles.megnet.path}"
+#     f"{ROOT}/models/{Model.megnet.path}"
 # ).set_index(Key.mat_id)
 
 
 # %% compare MEGNet predictions with old and new MP corrections
-ax = density_scatter(df=df_megnet, x=pred_col, y=f"{pred_col}_old_corr")
-save_fig(ax, "megnet-e-form-preds-old-vs-new-corr.png")
+ax = pmv.density_scatter(df=df_megnet, x=pred_col, y=f"{pred_col}_old_corr")
+pmv.save_fig(ax, "megnet-e-form-preds-old-vs-new-corr.png")
 
 
 # %%

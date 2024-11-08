@@ -3,17 +3,17 @@
 # %%
 import numpy as np
 import pandas as pd
+import pymatviz as pmv
 from aviary.wren.utils import get_prototype_from_protostructure
 from IPython.display import display
-from pymatviz import spacegroup_hist, spacegroup_sunburst
 from pymatviz.enums import Key
-from pymatviz.io import df_to_html_table, df_to_pdf, save_fig
+from pymatviz.io import df_to_html, df_to_pdf, save_fig
 from pymatviz.powerups import add_identity_line
 from pymatviz.ptable import ptable_heatmap_plotly
 from pymatviz.utils import PLOTLY, bin_df_cols
 
-from matbench_discovery import PDF_FIGS, SITE_FIGS, Model
-from matbench_discovery.data import DataFiles, df_wbm
+from matbench_discovery import PDF_FIGS, SITE_FIGS
+from matbench_discovery.data import DataFiles, Model, df_wbm
 from matbench_discovery.enums import MbdKey
 from matbench_discovery.preds import df_each_pred, df_preds
 
@@ -22,7 +22,7 @@ __date__ = "2023-03-20"
 
 
 # %%
-model = Model.wrenformer
+model = Model.wrenformer.label
 model_low = model.lower()
 max_each_true = 1
 min_each_pred = 1
@@ -46,7 +46,7 @@ df_mp.isopointal_proto_from_aflow.value_counts().head(12)
 
 
 # %%
-fig = spacegroup_hist(df_bad[Key.spg_num])
+fig = pmv.spacegroup_bar(df_bad[Key.spg_num])
 fig.layout.title.update(text=f"Spacegroup hist for {title}", y=0.96)
 fig.layout.margin.update(l=0, r=0, t=80, b=0)
 save_fig(fig, f"{PDF_FIGS}/spacegroup-hist-{model.lower()}-failures.pdf")
@@ -77,12 +77,12 @@ styler = df_proto_counts.head(10).style.background_gradient(cmap="viridis")
 styler.set_caption(f"Top 10 {proto_col} in {len(df_bad)} {model} failures")
 display(styler)
 img_name = f"proto-counts-{model_low}-failures"
-df_to_html_table(styler, file_path=f"{SITE_FIGS}/{img_name}.svelte")
+df_to_html(styler, file_path=f"{SITE_FIGS}/{img_name}.svelte")
 df_to_pdf(styler, f"{PDF_FIGS}/{img_name}.pdf")
 
 
 # %%
-fig = spacegroup_sunburst(
+fig = pmv.spacegroup_sunburst(
     df_bad[Key.spg_num], width=350, height=350, show_counts="percent"
 )
 # fig.layout.title.update(text=f"Spacegroup sunburst for {title}", x=0.5, font_size=14)
@@ -104,7 +104,7 @@ save_fig(fig, f"{PDF_FIGS}/elements-{model_low}-failures.pdf")
 
 
 # %%
-model = Model.wrenformer
+model = Model.wrenformer.label
 cols = [model, MbdKey.each_true]
 bin_cnt_col = "bin counts"
 df_bin = bin_df_cols(

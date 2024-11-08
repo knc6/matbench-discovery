@@ -4,8 +4,8 @@
 import math
 
 import pandas as pd
+import pymatviz as pmv
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 from pymatviz.utils import PLOTLY
 from sklearn.metrics import auc, precision_recall_curve, roc_curve
 from tqdm import tqdm
@@ -26,7 +26,7 @@ n_cols = 3
 n_rows = math.ceil(len(models) / n_cols)
 
 
-test_subset = globals().get("test_subset", TestSubset.full)
+test_subset = globals().get("test_subset", TestSubset.uniq_protos)
 
 if test_subset == TestSubset.uniq_protos:
     df_preds = df_preds.query(Key.uniq_proto)
@@ -113,8 +113,8 @@ img_name = f"roc-models{f'-{n_rows}x{n_cols}' if facet_plot else ''}"
 
 
 # %%
-save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
-save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=500, height=500)
+pmv.save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=500, height=500)
 
 
 # %%
@@ -174,7 +174,7 @@ fig.show()
 
 
 # %%
-save_fig(fig, f"{SITE_FIGS}/prc-models-{n_rows}x{n_cols}.svelte")
-save_fig(fig, f"{PDF_FIGS}/prc-models-{n_rows}x{n_cols}.pdf")
+pmv.save_fig(fig, f"{SITE_FIGS}/prc-models-{n_rows}x{n_cols}.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/prc-models-{n_rows}x{n_cols}.pdf")
 fig.update_yaxes(matches=None)
 fig.show()

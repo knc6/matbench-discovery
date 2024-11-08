@@ -15,10 +15,10 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pymatviz as pmv
 import umap
 from pymatgen.core import Structure
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 from tqdm import tqdm
 
 from matbench_discovery import MP_DIR, PDF_FIGS, WBM_DIR
@@ -156,8 +156,8 @@ if not os.path.isfile(umap_out_path):
     df_wbm = pd.read_csv(wbm_matminer_feat_path).set_index(Key.mat_id)
 
     # Drop all rows containing NaN values
-    df_wbm = df_wbm.dropna(axis=0)
-    df_mp = df_mp.dropna(axis=0)
+    df_wbm = df_wbm.dropna(axis="index")
+    df_mp = df_mp.dropna(axis="index")
 
     # Drop highly correlated features
     cols_to_drop = features_to_drop(df_mp, threshold=0.95)
@@ -203,4 +203,4 @@ cbar.ax.set_title("WBM step (0 = MP)", rotation=90, y=0.5, x=3, va="center")
 
 # %%
 plt.tight_layout()
-save_fig(ax, f"{PDF_FIGS}/wbm-final-struct-matminer-features-2d-umap.png", dpi=300)
+pmv.save_fig(ax, f"{PDF_FIGS}/wbm-final-struct-matminer-features-2d-umap.png", dpi=300)

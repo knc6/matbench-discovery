@@ -121,8 +121,8 @@ def main(**kwargs: Any) -> None:
     device = tools.init_device(args.device)
 
     if args.statistics_file is not None:
-        with open(args.statistics_file) as f:
-            statistics = json.load(f)
+        with open(args.statistics_file) as file:
+            statistics = json.load(file)
         print("Using statistics json file")
         args.r_max = statistics["r_max"]
         args.atomic_numbers = statistics["atomic_numbers"]
@@ -376,8 +376,6 @@ def main(**kwargs: Any) -> None:
             MLP_irreps=o3.Irreps(args.MLP_irreps),
             atomic_inter_scale=args.std,
             atomic_inter_shift=args.mean,
-            # TODO: the following options exist in `multi-GPU` branch but not Gaussian.
-            # check if necessary
             radial_MLP=ast.literal_eval(args.radial_MLP),
             radial_type=args.radial_type,
         )

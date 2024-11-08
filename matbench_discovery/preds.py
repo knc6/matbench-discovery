@@ -1,15 +1,16 @@
 """Centralize data-loading and computing metrics for plotting scripts."""
 
-from collections.abc import Sequence
-from typing import Any, Literal
-
 import pandas as pd
 from pymatviz.enums import Key
-from tqdm import tqdm
 
-from matbench_discovery import ROOT, STABILITY_THRESHOLD
-from matbench_discovery.data import Files, df_wbm, glob_to_df
-from matbench_discovery.enums import MbdKey, Model
+from matbench_discovery import STABILITY_THRESHOLD
+from matbench_discovery.data import (
+    Model,
+    df_wbm,
+    load_df_wbm_with_preds,
+    round_trip_yaml,
+)
+from matbench_discovery.enums import MbdKey, TestSubset
 from matbench_discovery.metrics import stable_metrics
 from matbench_discovery.plots import plotly_colors, plotly_line_styles, plotly_markers
 
@@ -17,168 +18,11 @@ __author__ = "Janosh Riebesell"
 __date__ = "2023-02-04"
 
 
-class PredFiles(Files):
-    """Data files provided by Matbench Discovery.
-    See https://janosh.github.io/matbench-discovery/contribute for data descriptions.
-    """
-
-    alignn = "alignn/2023-06-02-alignn-wbm-IS2RE.csv.gz"
-    # alignn_pretrained = "alignn/2023-06-03-mp-e-form-alignn-wbm-IS2RE.csv.gz"
-    # alignn_ff = "alignn_ff/2023-07-11-alignn-ff-wbm-IS2RE.csv.gz"
-
-    # BOWSR optimizer coupled with original megnet
-    bowsr_megnet = "bowsr/2023-01-23-bowsr-megnet-wbm-IS2RE.csv.gz"
-
-    # default CHGNet model from publication with 400,438 params
-    chgnet = "chgnet/2023-12-21-chgnet-0.3.0-wbm-IS2RE.csv.gz"
-    # chgnet_no_relax = "chgnet/2023-12-05-chgnet-0.3.0-wbm-IS2RE-no-relax.csv.gz"
-
-    # CGCNN 10-member ensemble
-    cgcnn = "cgcnn/2023-01-26-cgcnn-ens=10-wbm-IS2RE.csv.gz"
-
-    # CGCNN 10-member ensemble with 5-fold training set perturbations
-    cgcnn_p = "cgcnn/2023-02-05-cgcnn-perturb=5-wbm-IS2RE.csv.gz"
-
-    # original M3GNet straight from publication, not re-trained
-    m3gnet = "m3gnet/2023-12-28-m3gnet-wbm-IS2RE.csv.gz"
-    # m3gnet_direct = "m3gnet/2023-05-30-m3gnet-direct-wbm-IS2RE.csv.gz"
-    # m3gnet_ms = "m3gnet/2023-06-01-m3gnet-manual-sampling-wbm-IS2RE.csv.gz"
-
-    # MACE trained on original M3GNet training set
-    mace = "mace/2023-12-11-mace-wbm-IS2RE-FIRE-no-bad.csv.gz"
-
-    # original MEGNet straight from publication, not re-trained
-    megnet = "megnet/2022-11-18-megnet-wbm-IS2RE.csv.gz"
-
-    # SevenNet trained on MPtrj
-    sevennet = "sevennet/2024-07-11-sevennet-preds-no-bad.csv.gz"
-
-    # Magpie composition+Voronoi tessellation structure features + sklearn random forest
-    voronoi_rf = "voronoi_rf/2022-11-27-train-test/e-form-preds-IS2RE.csv.gz"
-
-    # wrenformer 10-member ensemble
-    wrenformer = "wrenformer/2022-11-15-wrenformer-ens=10-IS2RE-preds.csv.gz"
-
-    ## Proprietary Models
-    # GNoMe
-    gnome = "gnome/2023-11-01-gnome-preds-50076332.csv.gz"
-
-    # MatterSim
-    mattersim = "mattersim/mattersim-wbm-IS2RE.csv.gz"
-
-    ## Miscellaneous
-    # # CHGNet-relaxed structures fed into MEGNet for formation energy prediction
-    # chgnet_megnet = "chgnet/2023-03-06-chgnet-0.2.0-wbm-IS2RE.csv.gz"
-    # # M3GNet-relaxed structures fed into MEGNet for formation energy prediction
-    # m3gnet_megnet = "m3gnet/2022-10-31-m3gnet-wbm-IS2RE.csv.gz"
-    # megnet_rs2re = "megnet/2023-08-23-megnet-wbm-RS2RE.csv.gz"
-
-
-PredFiles.base_dir = f"{ROOT}/models"  # type: ignore[attr-defined]
-PredFiles.label_map = Model.key_val_dict()  # type: ignore[attr-defined]
-
-
-def load_df_wbm_with_preds(
-    *,
-    models: Sequence[str] = (),
-    pbar: bool = True,
-    id_col: str = Key.mat_id,
-    subset: pd.Index | Sequence[str] | Literal["uniq_protos"] | None = None,
-    **kwargs: Any,
-) -> pd.DataFrame:
-    """Load WBM summary dataframe with model predictions from disk.
-
-    Args:
-        models (Sequence[str], optional): Model names must be keys of
-            matbench_discovery.data.PredFiles. Defaults to all models.
-        pbar (bool, optional): Whether to show progress bar. Defaults to True.
-        id_col (str, optional): Column to set as df.index. Defaults to "material_id".
-        subset (pd.Index | Sequence[str] | 'uniq_protos' | None, optional):
-            Subset of material IDs to keep. Defaults to None, which loads all materials.
-            'uniq_protos' drops WBM structures with matching prototype in MP
-            training set and duplicate prototypes in WBM test set (keeping only the most
-            stable structure per prototype). This increases the 'OOD-ness' of WBM.
-        **kwargs: Keyword arguments passed to glob_to_df().
-
-    Raises:
-        ValueError: On unknown model names.
-
-    Returns:
-        pd.DataFrame: WBM summary dataframe with model predictions.
-    """
-    valid_pred_files = {model.name for model in PredFiles}
-    if models == ():
-        models = tuple(valid_pred_files)
-    inv_label_map = {v: k for k, v in PredFiles.label_map.items()}  # type: ignore[attr-defined]
-    models = {inv_label_map.get(model, model) for model in models}
-    if mismatch := ", ".join(models - valid_pred_files):
-        raise ValueError(
-            f"Unknown models: {mismatch}, expected subset of {valid_pred_files}"
-        )
-
-    dfs: dict[str, pd.DataFrame] = {}
-    model: str = ""
-    try:
-        for model in (bar := tqdm(models, disable=not pbar, desc="Loading preds")):
-            bar.set_postfix_str(model)
-            pred_file = PredFiles[model]
-            df_preds = glob_to_df(pred_file.path, pbar=False, **kwargs)
-            dfs[pred_file.label] = df_preds.set_index(id_col)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to load {model=}") from exc
-
-    from matbench_discovery.data import df_wbm
-
-    df_out = df_wbm.copy()
-    for model_name, df_preds in dfs.items():
-        model_key = model_name.lower().replace("→", "_").replace(" ", "_")
-
-        cols = [
-            col
-            for col in df_preds
-            if col.startswith((f"e_form_per_atom_{model_key}", f"e_{model_key}_"))
-        ]
-        if cols:
-            if len(cols) > 1:
-                print(
-                    f"Warning: multiple pred cols for {model_name=}, using {cols[0]!r} "
-                    f"out of {cols=}"
-                )
-            df_out[model_name] = df_preds[cols[0]]
-
-        elif pred_cols := list(df_preds.filter(like="_pred_ens")):
-            if len(pred_cols) != 1:
-                raise ValueError(f"{len(pred_cols)=}, expected 1")
-            df_out[model_name] = df_preds[pred_cols[0]]
-            if std_cols := list(df_preds.filter(like="_std_ens")):
-                df_out[f"{model_name}_std"] = df_preds[std_cols[0]]
-
-        elif pred_cols := list(df_preds.filter(like=r"_pred_")):
-            # make sure we average the expected number of ensemble member predictions
-            if len(pred_cols) != 10:
-                raise ValueError(f"{len(pred_cols)=}, expected 10")
-            df_out[model_name] = df_preds[pred_cols].mean(axis=1)
-
-        else:
-            cols = list(df_preds)
-            msg = f"No pred col for {model_name=}, available {cols=}"
-            if model_name != model_key:
-                msg = msg.replace(", ", f" ({model_key=}), ")
-            raise ValueError(msg)
-
-    if subset == "uniq_protos":
-        df_out = df_out.query(Key.uniq_proto)
-    elif subset is not None:
-        df_out = df_out.loc[subset]
-
-    return df_out
-
-
 # load WBM summary dataframe with all models' formation energy predictions (eV/atom)
 df_preds = load_df_wbm_with_preds().round(3)
-# for combo in [["CHGNet", "M3GNet"]]:
-#     df_preds[" + ".join(combo)] = df_preds[combo].mean(axis=1)
-#     PredFiles[" + ".join(combo)] = "combo"
+# for combo in [("CHGNet", "M3GNet")]:
+#     df_preds[" + ".join(combo)] = df_preds[combo].mean(axis=1)  # noqa: ERA001
+#     Model[" + ".join(combo)] = "combo"  # noqa: ERA001
 
 
 df_metrics = pd.DataFrame()
@@ -198,7 +42,7 @@ uniq_proto_prevalence = (
     df_wbm.query(Key.uniq_proto)[MbdKey.each_true] <= STABILITY_THRESHOLD
 ).mean()
 
-for model in PredFiles:
+for model in Model:
     model_name = model.label
     each_pred = (
         df_preds[MbdKey.each_true] + df_preds[model_name] - df_preds[MbdKey.e_form_dft]
@@ -208,7 +52,7 @@ for model in PredFiles:
     )
 
     df_uniq_proto_preds = df_preds[df_wbm[Key.uniq_proto]]
-    list(df_uniq_proto_preds)
+
     each_pred_uniq_proto = (
         df_uniq_proto_preds[MbdKey.each_true]
         + df_uniq_proto_preds[model_name]
@@ -280,3 +124,50 @@ for model in models:
 df_each_err[MbdKey.each_err_models] = df_preds[MbdKey.each_err_models] = (
     df_each_err.abs().mean(axis=1)
 )
+
+
+def write_discovery_metrics_to_yaml(model: Model) -> None:
+    """Write materials discovery metrics to model YAML metadata files."""
+    yaml_path = f"{Model.base_dir}/{model.url}"
+
+    full_metrics = df_metrics[model.label].to_dict()
+    metrics_10k_most_stable = df_metrics_10k[model.label].to_dict()
+    metrics_unique_protos = df_metrics_uniq_protos[model.label].to_dict()
+
+    each_pred_uniq_proto = (
+        df_uniq_proto_preds[MbdKey.each_true]
+        + df_uniq_proto_preds[model_name]
+        - df_uniq_proto_preds[MbdKey.e_form_dft]
+    )
+    most_stable_10k_idx = each_pred_uniq_proto.nsmallest(10_000).index
+
+    for metrics, df_tmp in (
+        (full_metrics, df_preds),
+        (metrics_10k_most_stable, df_preds.loc[most_stable_10k_idx]),
+        (metrics_unique_protos, df_preds.query(Key.uniq_proto)),
+    ):
+        metrics[MbdKey.missing_preds] = int(df_tmp[model_name].isna().sum())
+        metrics[MbdKey.missing_percent] = (
+            f"{metrics[MbdKey.missing_preds] / len(df_tmp):.2%}"
+        )
+
+    discovery_metrics = {
+        TestSubset.full_test_set: full_metrics,
+        TestSubset.most_stable_10k: metrics_10k_most_stable,
+        TestSubset.uniq_protos: metrics_unique_protos,
+    }
+
+    # Add or update discovery metrics
+    with open(yaml_path) as file:
+        model_metadata = round_trip_yaml.load(file)
+
+    model_metadata.setdefault("metrics", {})["discovery"] = discovery_metrics
+
+    # Write back to file
+    with open(yaml_path, mode="w") as file:
+        round_trip_yaml.dump(model_metadata, file)
+
+
+if __name__ == "__main__":
+    for model in Model:
+        write_discovery_metrics_to_yaml(model)

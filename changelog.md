@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file. Dates are displayed in UTC.
 
+#### [v1.3.1](https://github.com/janosh/matbench-discovery/compare/v1.3.0...v1.3.1)
+
+> 11 September 2024
+
+- Fix model detail pages for models with array of training sets and non-string notes in YAML metadata [`#138`](https://github.com/janosh/matbench-discovery/pull/138)
+- Move element-projected convex hull distance errors to model detail pages [`#137`](https://github.com/janosh/matbench-discovery/pull/137)
+- Show single-model energy parity plots on model detail pages [`#136`](https://github.com/janosh/matbench-discovery/pull/136)
+- fix pkg unnecessarily pinning numpy&gt;2 [`8eb916b`](https://github.com/janosh/matbench-discovery/commit/8eb916b73e36417b23dbf925452a696b9c32c1c0)
+- fix errors in eda_wbm.py [`c1f34da`](https://github.com/janosh/matbench-discovery/commit/c1f34dac228ef7f0da7598e99fe9be6db36198f5)
+- fix /data page MP/WBM element count ptable heatmaps [`1ebad52`](https://github.com/janosh/matbench-discovery/commit/1ebad52cff8e80febf7beadb1fe210b7741802b5)
+
+#### [v1.3.0](https://github.com/janosh/matbench-discovery/compare/v1.2.0...v1.3.0)
+
+> 6 September 2024
+
+- Add metrics table download buttons [`#135`](https://github.com/janosh/matbench-discovery/pull/135)
+- Restore MPTrj EDA to working order [`#130`](https://github.com/janosh/matbench-discovery/pull/130)
+- Refactor model preds loading to use new required `pred_col` key in YAML metadata files [`#134`](https://github.com/janosh/matbench-discovery/pull/134)
+- Orb models [`#133`](https://github.com/janosh/matbench-discovery/pull/133)
+- Allow multiple training sets per model in YAML metadata [`#132`](https://github.com/janosh/matbench-discovery/pull/132)
+- Correct batch_size of SevenNet-0 [`#129`](https://github.com/janosh/matbench-discovery/pull/129)
+- Test more plotting scripts in CI [`#127`](https://github.com/janosh/matbench-discovery/pull/127)
+- Add individual model detail pages [`#126`](https://github.com/janosh/matbench-discovery/pull/126)
+- Working save trajectory code with energies also being saved for test mace. [`#123`](https://github.com/janosh/matbench-discovery/pull/123)
+- Type hint optimizer and filter in `test_mace` and `test_7net` correctly, fix pickled `PatchedPhaseDiagram` and `compile_wbm_test_set.py` [`#122`](https://github.com/janosh/matbench-discovery/pull/122)
+- `data.py` add `ase_atoms_(to|from)_zip` [`#120`](https://github.com/janosh/matbench-discovery/pull/120)
+- Test `mace_mp_0b` [`#119`](https://github.com/janosh/matbench-discovery/pull/119)
+- Update the function names for wren utils given breaking changes in Aviary [`#117`](https://github.com/janosh/matbench-discovery/pull/117)
+- Update table caption for landing page [`#116`](https://github.com/janosh/matbench-discovery/pull/116)
+- Add `n_estimators` to `model_metadata.yml` [`#115`](https://github.com/janosh/matbench-discovery/pull/115)
+- Refactor `Files`, `DataFiles` and `PredFiles` to be `StrEnums` [`#114`](https://github.com/janosh/matbench-discovery/pull/114)
+- Type hint optimizer and filter in `test_mace` and `test_7net` correctly, fix pickled `PatchedPhaseDiagram` and `compile_wbm_test_set.py` (#122) [`#121`](https://github.com/janosh/matbench-discovery/issues/121)
+- fix site build error [`4d3d33f`](https://github.com/janosh/matbench-discovery/commit/4d3d33f63a963f0d54f5538af04dd74866456c8f)
+- fix metrics table proprietary models toggle [`69f25b4`](https://github.com/janosh/matbench-discovery/commit/69f25b43e194f04d34b1f6dd854856fa6859d2b0)
+- access pymatviz.io.save_fig from namespace [`db20338`](https://github.com/janosh/matbench-discovery/commit/db20338d3cdbaa72e81170c5060be5384131a23d)
+- add data-sort-value attr to metrics table cells in "model params" and [`c989f48`](https://github.com/janosh/matbench-discovery/commit/c989f488a2fcf637b63aa4077372958596a3c5e4)
+- fix typos, bump min pymatviz==0.10.1, bump ruff and fix errors [`442abf9`](https://github.com/janosh/matbench-discovery/commit/442abf91b05b318c9fd2b46e6a837e3cace7f87d)
+- fix ModelCard not handling multiple training sets correctly [`a2e4c94`](https://github.com/janosh/matbench-discovery/commit/a2e4c946e0715f91c2328b794c829b0934b08eb8)
+
 #### [v1.2.0](https://github.com/janosh/matbench-discovery/compare/v1.1.2...v1.2.0)
 
 > 15 July 2024
@@ -11,7 +50,7 @@ All notable changes to this project will be documented in this file. Dates are d
 - Add new `/models/mace` page with formation energy and raw energy parity plots [`#111`](https://github.com/janosh/matbench-discovery/pull/111)
 - Migrate `Key` enum to use `pymatviz.enums.Key` [`#110`](https://github.com/janosh/matbench-discovery/pull/110)
 - Add MatterSim predictions [`#104`](https://github.com/janosh/matbench-discovery/pull/104)
-- fix: CHGNet MPTrj training set now published and widely used. [`#107`](https://github.com/janosh/matbench-discovery/pull/107)
+- fix: CHGNet MPtrj training set now published and widely used. [`#107`](https://github.com/janosh/matbench-discovery/pull/107)
 - Fix `figs/e-form-parity-models` showing convex hull distance instead of formation energy R² in subplot titles [`#106`](https://github.com/janosh/matbench-discovery/pull/106)
 - fix: changes to wrenformer test script [`#105`](https://github.com/janosh/matbench-discovery/pull/105)
 - refactor eda_mp_trj.py using pymatviz.plot_histogram [`b10e608`](https://github.com/janosh/matbench-discovery/commit/b10e608f5c0d3bec6f77097dcd84e5e2f11b4a58)

@@ -66,29 +66,24 @@
       <code>composition</code>
       mode maps it to {`{Fe: 2, O: 3}`}.
     </p>
-    <h3>WBM</h3>
     <PtableHeatmap
       heatmap_values={wbm_elem_counts}
       color_scale={color_scale[0]}
-      color_bar_props={{ label: `WBM Element Occurrences` }}
+      color_bar_props={{ label: `WBM element counts by ${count_mode}` }}
       {log}
-      {count_mode}
     />
   </svelte:fragment>
 
   <svelte:fragment slot="mp-elements-heatmap">
-    <h3>MP</h3>
     <PtableHeatmap
       heatmap_values={mp_elem_counts}
       color_scale={color_scale[0]}
-      color_bar_props={{ label: `MP Element Occurrences` }}
+      color_bar_props={{ label: `MP element counts by ${count_mode}` }}
       {log}
-      {count_mode}
     />
   </svelte:fragment>
 
   <svelte:fragment slot="mp-trj-elements-heatmap">
-    <h3>MPtrj</h3>
     <MPtrjElemCountsPtable {count_mode} {log} color_scale={color_scale[0]} />
   </svelte:fragment>
 
@@ -121,7 +116,7 @@
   quaternaries. MP has a more even distribution, in particular with more than double the
   relative share of quaternary phases and a significant number of quinternaries which are
   almost absent from WBM. Not shown in this plot for visual clarity are 3% of MP
-  structures containing more than 5 elements (up to 9). We also include MPTrj in this plot
+  structures containing more than 5 elements (up to 9). We also include MPtrj in this plot
   to show a slight drop in relative abundance of quinternary and higher phases vs MP
   ground states.
 </p>
@@ -130,14 +125,11 @@
 <p>
   Histogram of number of atoms per structure. The inset shows the same distribution
   log-scaled to visualize the tail of large structures. The green cumulative line in the
-  inset shows that 82% have less than 50 sites and 97% of structures in MPTrj have less
+  inset shows that 82% have less than 50 sites and 97% of structures in MPtrj have less
   than 100 atoms.
 </p>
 
 <style>
-  h3 {
-    margin: 1em 0 0.5em;
-  }
   label {
     display: flex;
     gap: 1ex;

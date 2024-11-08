@@ -3,7 +3,7 @@
 from enum import StrEnum, unique
 from typing import Self
 
-from pymatviz.utils import styled_html_tag
+import pymatviz as pmv
 
 
 class LabelEnum(StrEnum):
@@ -49,24 +49,44 @@ class LabelEnum(StrEnum):
         return {str(val.label): val.description for val in cls.__members__.values()}
 
 
+eV_per_atom = pmv.html_tag(  # noqa: N816
+    "(eV/atom)", tag="span", style="font-size: 0.8em; font-weight: lighter;"
+)
+
+
 @unique
 class MbdKey(LabelEnum):
     """Keys used to access dataframes columns."""
 
-    e_form_dft = "e_form_per_atom_mp2020_corrected", "DFT E_form"
-    e_form_raw = "e_form_per_atom_uncorrected", "DFT E_form raw"
-    e_form_wbm = "e_form_per_atom_wbm", "WBM E_form"
+    dft_energy = "uncorrected_energy", "DFT Energy"
+    e_form_dft = (
+        "e_form_per_atom_mp2020_corrected",
+        f"DFT E<sub>form</sub> {eV_per_atom}",
+    )
+    e_form_raw = (
+        "e_form_per_atom_uncorrected",
+        f"DFT raw E<sub>form</sub> {eV_per_atom}",
+    )
+    e_form_wbm = "e_form_per_atom_wbm", f"WBM E<sub>form</sub> {eV_per_atom}"
     each_true = "e_above_hull_mp2020_corrected_ppd_mp", "E<sub>MP hull dist</sub>"
+    each_wbm = "e_above_hull_wbm", "E<sub>WBM hull dist</sub>"
     each_mean_models = "each_mean_models", "E<sub>hull dist</sub> mean of models"
     each_err_models = "each_err_models", "E<sub>hull dist</sub> mean error of models"
     model_std_each = "each_std_models", "Std. dev. over models"
+    openness = "openness", "Openness"
+
     init_wyckoff = (
         "wyckoff_spglib_initial_structure",
         "Aflow-Wyckoff Label Initial Structure",
     )
-    openness = "openness", "Openness"
-    dft_energy = "uncorrected_energy", "DFT Energy"
-    each_wbm = "e_above_hull_wbm", "E<sub>WBM hull dist</sub>"
+    international_spg_name = "international_spg_name", "International space group name"
+    spg_num_diff = "spg_num_diff", "Difference in space group number"
+    n_sym_ops_diff = "n_sym_ops_diff", "Difference in number of symmetry operations"
+    structure_rmsd_vs_dft = "structure_rmsd_vs_dft", "RMSD of structure to DFT"
+
+    # keep in sync with model-schema.yml
+    missing_preds = "missing_preds", "Missing predictions"
+    missing_percent = "missing_percent", "Missing predictions (percent)"
 
 
 @unique
@@ -80,7 +100,7 @@ class Task(LabelEnum):
     S2RE = "S2RE", "structure to relaxed energy"
     S2EF = "S2EF", "structure to energy, force"
     S2EFS = "S2EFS", "structure to energy, force, stress"
-    S2EFSM = "S2EFSM" "structure to energy, force, stress, magmoms"
+    S2EFSM = "S2EFSM", "structure to energy, force, stress, magmoms"
     IP2E = "IP2E", "initial prototype to energy"
     IS2E = "IS2E", "initial structure to energy"
     # IS2RE is for models that learned a discrete version of PES like CGCNN+P
@@ -99,10 +119,13 @@ class Task(LabelEnum):
 class Targets(LabelEnum):
     """Thermodynamic stability prediction task types."""
 
-    E = "E", "energy"
-    EF = "EF", "energy forces"
-    EFS = "EFS", "energy forces stress"
-    EFSM = "EFSM", "energy forces stress magmoms"
+    E = "E", "E"
+    EF_C = "EF_C", "EF<sub>C</sub>", "Energy with conservative Forces"
+    EF_D = "EF_D", "EF<sub>D</sub>", "Energy with direct Forces"
+    EFS_C = "EFS_C", "EFS<sub>C</sub>", "Energy with conservative Forces and Stress"
+    EFS_D = "EFS_D", "EFS<sub>D</sub>", "Energy with direct Forces and Stress"
+    EFS_CM = "EFS_CM", "EFS<sub>C</sub>M", "Energy with conservative Forces and Stress; plus Magmoms"  # fmt: skip  # noqa: E501
+    EFS_DM = "EFS_DM", "EFS<sub>D</sub>M", "Energy with direct Forces and Stress; plus Magmoms"  # fmt: skip  # noqa: E501
 
 
 @unique
@@ -132,13 +155,8 @@ class TestSubset(LabelEnum):
     """Which subset of the test data to use for evaluation."""
 
     uniq_protos = "uniq_protos", "Unique Structure Prototypes"
-    ten_k_most_stable = "10k_most_stable", "10k Most Stable"
-    full = "full", "Full Test Set"
-
-
-eV_per_atom = styled_html_tag(  # noqa: N816
-    "(eV/atom)", tag="span", style="font-size: 0.8em; font-weight: lighter;"
-)
+    most_stable_10k = "most_stable_10k", "10k Most Stable Materials"
+    full_test_set = "full_test_set", "Full Test Set"
 
 
 class Quantity(LabelEnum):
@@ -165,31 +183,3 @@ class Quantity(LabelEnum):
     formula = "Formula"
     stress = "σ (eV/Å³)"  # noqa: RUF001
     stress_trace = "1/3 Tr(σ) (eV/Å³)"  # noqa: RUF001
-
-
-class Model(LabelEnum):
-    """Model labels for plots."""
-
-    alignn_ff = "ALIGNN FF"
-    alignn_pretrained = "ALIGNN Pretrained"
-    alignn = "ALIGNN"
-    bowsr_megnet = "BOWSR"
-    cgcnn_p = "CGCNN+P"
-    cgcnn = "CGCNN"
-    chgnet_megnet = "CHGNet→MEGNet"
-    chgnet = "CHGNet"
-    dft = "DFT"
-    gnome = "GNoME"
-    m3gnet_direct = "M3GNet DIRECT"
-    m3gnet_megnet = "M3GNet→MEGNet"
-    m3gnet_ms = "M3GNet MS"
-    m3gnet = "M3GNet"
-    mace = "MACE"
-    mattersim = "MatterSim"
-    megnet_rs2re = "MEGNet RS2RE"
-    megnet = "MEGNet"
-    pfp = "PFP"
-    sevennet = "SevenNet"
-    voronoi_rf = "Voronoi RF"
-    wbm = "WBM"
-    wrenformer = "Wrenformer"

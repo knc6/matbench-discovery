@@ -88,10 +88,10 @@ Initial structures (after element substitution but before DFT relaxation) were s
 
 > Edit 2024-05-31: These links are now dead. The data is still available on Materials Cloud and Google Drive.
 
-The [paper itself][wbm paper] links to a [Halle University data page](https://tddft.org/bmg/data.php) which lists download URLs for CIF files and the `ComputedStructureEntries` (CSEs) of steps 1-3:
+The [paper itself][wbm paper] links to a discontinued site `https://tddft.org/bmg/data.php` which used to list download URLs for CIF files and the `ComputedStructureEntries` (CSEs) of steps 1-3:
 
-| [Halle University links](https://tddft.org/bmg/data.php) | [step 1 CSEs](https://tddft.org/bmg/files/data/substitutions_000.json.bz2) | [step 2 CSEs](https://tddft.org/bmg/files/data/substitutions_001.json.bz2) | [step 3 CSEs](https://tddft.org/bmg/files/data/substitutions_002.json.bz2) | [CIF files](https://tddft.org/bmg/files/data/similarity-cifs.tar.gz) |
-| -------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Halle University links | [step 1 CSEs](https://tddft.org/bmg/files/data/substitutions_000.json.bz2) | [step 2 CSEs](https://tddft.org/bmg/files/data/substitutions_001.json.bz2) | [step 3 CSEs](https://tddft.org/bmg/files/data/substitutions_002.json.bz2) | [CIF files](https://tddft.org/bmg/files/data/similarity-cifs.tar.gz) |
+| ---------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 
 ### Materials Cloud
 
@@ -120,17 +120,23 @@ The number of stable materials (according to the MP convex hull which is spanned
 
 The WBM test set and even more so the MP training set are heavily oxide dominated. The WBM test set is about 75% larger than the MP training set and also more chemically diverse, containing a higher fraction of transition metals, post-transition metals and metalloids. Our goal in picking such a large diverse test set is future-proofing. Ideally, this data will provide a challenging materials discovery test bed even for large foundational ML models in the future.
 
+### WBM
+
+The WBM test set consists of 256,963 WBM `ComputedStructureEntries`
+
 <slot name="wbm-elements-heatmap">
   <img src="./figs/wbm-elements.svg" alt="Periodic table log heatmap of WBM elements">
 </slot>
 
-The WBM test set consists of 256,963 WBM `ComputedStructureEntries`
+### MP
+
+The MP training set consists of 154,719 `ComputedStructureEntries`
 
 <slot name="mp-elements-heatmap">
   <img src="./figs/mp-elements.svg" alt="Periodic table log heatmap of MP elements">
 </slot>
 
-The MP training set consists of 154,719 `ComputedStructureEntries`
+### MPtrj
 
 <slot name="mp-trj-elements-heatmap" />
 

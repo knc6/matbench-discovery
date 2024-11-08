@@ -70,7 +70,7 @@ export default {
               const id_lower = id.toLowerCase()
               let idx = fig_index.indexOf(id_lower) + 1
               if (idx == 0) {
-                console.error(
+                console.trace(
                   `Figure id='${id}' not found, expected one of ${fig_index}`,
                 )
                 idx = `not found`
@@ -108,9 +108,5 @@ export default {
       $pkg: `../matbench_discovery`,
       $figs: `src/figs`,
     },
-  },
-
-  vitePlugin: {
-    inspector: true,
   },
 }

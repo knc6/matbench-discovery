@@ -7,11 +7,11 @@ See fig. S1 in https://science.org/doi/10.1126/sciadv.abn4117.
 # %%
 from typing import Final
 
-from pymatviz.io import save_fig
+import pymatviz as pmv
 from pymatviz.utils import PLOTLY
 
 from matbench_discovery import PDF_FIGS
-from matbench_discovery.data import df_wbm
+from matbench_discovery.data import Model, df_wbm
 from matbench_discovery.enums import MbdKey
 from matbench_discovery.plots import hist_classified_stable_vs_hull_dist
 from matbench_discovery.preds import df_each_pred
@@ -21,9 +21,7 @@ __date__ = "2022-06-18"
 
 
 # %%
-# model_name = "Wrenformer"
-model_name = "CHGNet"
-# model_name = "CGCNN+P"
+model_name = Model.mace.label
 which_energy: Final = "pred"
 df_each_pred[MbdKey.each_true] = df_wbm[MbdKey.each_true]
 backend: Final = PLOTLY
@@ -47,5 +45,5 @@ if backend == PLOTLY:
 
 # %%
 img_name = f"hist-clf-{which_energy}-hull-dist-{model_name}"
-# save_fig(fig, f"{FIGS}/{img_name}.svelte")
-save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf")
+# pmv.save_fig(fig, f"{FIGS}/{img_name}.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf")

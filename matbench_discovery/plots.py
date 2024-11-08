@@ -190,10 +190,10 @@ def hist_classified_stable_vs_hull_dist(
         )[which_energy]
 
         if stability_threshold is not None:
-            for ax in [fig] if isinstance(fig, plt.Axes) else fig.flat:
-                ax.set(xlabel=xlabel, ylabel=y_label, xlim=x_lim)
+            for ax_i in [fig] if isinstance(fig, plt.Axes) else fig.flat:
+                ax_i.set(xlabel=xlabel, ylabel=y_label, xlim=x_lim)
                 label = "Stability Threshold"
-                ax.axvline(
+                ax_i.axvline(
                     stability_threshold, color="black", linestyle="--", label=label
                 )
 
@@ -228,8 +228,8 @@ def hist_classified_stable_vs_hull_dist(
         )
 
         if backend == MATPLOTLIB:
-            for ax in fig.flat if isinstance(fig, np.ndarray) else [fig]:
-                ax_acc = ax.twinx()
+            for ax_i in fig.flat if isinstance(fig, np.ndarray) else [fig]:
+                ax_acc = ax_i.twinx()
                 ax_acc.set_ylabel("Rolling Accuracy", color="darkblue")
                 ax_acc.tick_params(labelcolor="darkblue")
                 ax_acc.set(ylim=(0, 1.1))
@@ -616,16 +616,22 @@ def cumulative_metrics(
     Returns:
         tuple[plt.Figure | go.Figure, pd.DataFrame]: The matplotlib/plotly figure and
             dataframe of cumulative metrics for each model.
+
+    Raises:
+        ValueError: If metrics are not a subset of ("Precision", "Recall", "F1", "MAE",
+            "RMSE").
     """
     dfs: dict[str, pd.DataFrame] = defaultdict(pd.DataFrame)
 
-    # largest number of materials predicted stable by any model, determines x-axis range
-    n_max_pred_stable = (df_preds < stability_threshold).sum().max()
+    # number of materials predicted stable by each model
+    n_pred_stable_per_model = (df_preds <= stability_threshold).sum(axis=0)
+    n_max_pred_stable = n_pred_stable_per_model.max()  # determines x-axis range
     # use log2-spaced sampling to get higher sampling density at equal file size for
     # start of the discovery campaign where model performance fluctuates more
-    longest_xs = np.logspace(0, np.log2(n_max_pred_stable - 1), n_points, base=2)
+    log_xs = np.logspace(0, np.log2(n_max_pred_stable - 1), n_points, base=2)
+    allowed_xs = np.sort([*log_xs, *n_pred_stable_per_model])
     for metric in metrics:
-        dfs[metric].index = longest_xs
+        dfs[metric].index = allowed_xs
 
     valid_metrics = {"Precision", "Recall", "F1", "MAE", "RMSE"}
     if invalid_metrics := set(metrics) - valid_metrics:
@@ -638,57 +644,60 @@ def cumulative_metrics(
         # sort targets by model ranking
         each_true = e_above_hull_true.loc[each_pred.index]
 
-        true_pos_cum, false_neg_cum, false_pos_cum, _true_neg_cum = map(
+        n_true_pos_cum, n_false_neg_cum, n_false_pos_cum, _n_true_neg_cum = map(
             np.cumsum,
             classify_stable(
                 each_true, each_pred, stability_threshold=stability_threshold
             ),
         )
 
-        # precision aka positive predictive value (PPV)
-        n_total_pos = true_pos_cum.iloc[-1] + false_neg_cum.iloc[-1]
-        precision_cum = true_pos_cum / (true_pos_cum + false_pos_cum)
-        recall_cum = true_pos_cum / n_total_pos  # aka true_pos_rate aka sensitivity
+        n_total_pos_cum = n_true_pos_cum + n_false_neg_cum
+        # n_total_neg_cum = n_true_neg_cum + n_false_pos_cum
+        n_pred_pos_cum = n_true_pos_cum + n_false_pos_cum
 
-        n_pred_stable = sum(each_pred <= stability_threshold)
-        model_range = np.arange(n_pred_stable)  # xs for interpolation
-        xs_model = longest_xs[longest_xs < n_pred_stable - 1]  # xs for plotting
+        # prevalence_cum = n_total_pos_cum / (n_total_pos_cum + n_total_neg_cum)
+        precision_cum = n_true_pos_cum / n_pred_pos_cum  # model's discovery rate
+        recall_cum = n_true_pos_cum / n_total_pos_cum.iloc[-1]
+
+        n_pred_pos = n_pred_pos_cum.iloc[-1]
+        model_range = np.arange(n_pred_pos) + 1  # xs for interpolation
+        xs_model = allowed_xs[allowed_xs <= n_pred_pos]  # xs for plotting
 
         cubic_interpolate = functools.partial(scipy.interpolate.interp1d, kind="cubic")
 
         if "Precision" in metrics:
-            prec_interp = cubic_interpolate(model_range, precision_cum[:n_pred_stable])
-            dfs["Precision"][model_name] = dict(zip(xs_model, prec_interp(xs_model)))
+            prec_interp = cubic_interpolate(model_range, precision_cum[:n_pred_pos])
+            dfs["Precision"].loc[xs_model, model_name] = prec_interp(xs_model)
 
         if "Recall" in metrics:
-            recall_interp = cubic_interpolate(model_range, recall_cum[:n_pred_stable])
-            dfs["Recall"][model_name] = dict(zip(xs_model, recall_interp(xs_model)))
+            recall_interp = cubic_interpolate(model_range, recall_cum[:n_pred_pos])
+            dfs["Recall"].loc[xs_model, model_name] = recall_interp(xs_model)
 
         if "F1" in metrics:
             f1_cum = 2 * (precision_cum * recall_cum) / (precision_cum + recall_cum)
-            f1_interp = cubic_interpolate(model_range, f1_cum[:n_pred_stable])
-            dfs["F1"][model_name] = dict(zip(xs_model, f1_interp(xs_model)))
+            f1_interp = cubic_interpolate(model_range, f1_cum[:n_pred_pos])
+            dfs["F1"].loc[xs_model, model_name] = f1_interp(xs_model)
 
         cum_counts = np.arange(1, len(each_true) + 1)
         if "MAE" in metrics:
             cum_errors = (each_true - each_pred).abs().cumsum()
             mae_cum = cum_errors / cum_counts
-            mae_interp = cubic_interpolate(model_range, mae_cum[:n_pred_stable])
-            dfs["MAE"][model_name] = dict(zip(xs_model, mae_interp(xs_model)))
+            mae_interp = cubic_interpolate(model_range, mae_cum[:n_pred_pos])
+            dfs["MAE"].loc[xs_model, model_name] = mae_interp(xs_model)
 
         if "RMSE" in metrics:
             rmse_cum = (((each_true - each_pred) ** 2).cumsum() / cum_counts) ** 0.5
-            rmse_interp = cubic_interpolate(model_range, rmse_cum[:n_pred_stable])
-            dfs["RMSE"][model_name] = dict(zip(xs_model, rmse_interp(xs_model)))
+            rmse_interp = cubic_interpolate(model_range, rmse_cum[:n_pred_pos])
+            dfs["RMSE"].loc[xs_model, model_name] = rmse_interp(xs_model)
 
-    for key in dfs:
+    for key, df_i in dfs.items():
+        # will be used as facet_col in plotly to split different metrics into subplots
+        df_i["metric"] = key
         # drop all-NaN rows so plotly plot x-axis only extends to largest number of
         # predicted materials by any model
-        dfs[key] = dfs[key].dropna(how="all")
-        # will be used as facet_col in plotly to split different metrics into subplots
-        dfs[key]["metric"] = key
+        dfs[key] = df_i.dropna(how="all")
 
-    df_cum = pd.concat(dfs.values())
+    df_cumu_metrics = pd.concat(dfs.values())
     # subselect rows for speed, plot has sufficient precision with 1k rows
     n_stable = sum(e_above_hull_true <= STABILITY_THRESHOLD)
 
@@ -702,10 +711,10 @@ def cumulative_metrics(
         line_kwargs = dict(
             linewidth=3, markevery=[-1], marker="x", markersize=14, markeredgewidth=2.5
         )
-        # TODO breaks for len(metrics) == 1 since axs has no .flat attribute
-        # assert len(axs.flat) == len(metrics), f"{len(axs.flat)=} != {len(metrics)=}"
 
-        for metric, ax in zip(metrics, axs.flat if len(metrics) > 1 else [axs]):
+        for metric, ax in zip(
+            metrics, axs.flat if len(metrics) > 1 else [axs], strict=False
+        ):
             # select every n-th row of df so that 1000 rows are left for increased
             # plotting speed and reduced file size
             # falls back on every row if df has less than 1000 rows
@@ -752,7 +761,7 @@ def cumulative_metrics(
     elif backend == PLOTLY:
         n_cols = kwargs.pop("facet_col_wrap", 2)
         kwargs.setdefault("facet_col_spacing", 0.03)
-        fig = df_cum.plot(
+        fig = df_cumu_metrics.plot(
             backend=backend,
             facet_col="metric",
             facet_col_wrap=n_cols,
@@ -802,7 +811,7 @@ def cumulative_metrics(
     else:
         raise ValueError(f"Unknown {backend=}")
 
-    return fig, df_cum
+    return fig, df_cumu_metrics
 
 
 def wandb_scatter(table: wandb.Table, fields: dict[str, str], **kwargs: Any) -> None:
@@ -813,6 +822,9 @@ def wandb_scatter(table: wandb.Table, fields: dict[str, str], **kwargs: Any) -> 
         fields (dict[str, str]): Map from table columns to fields defined in the custom
             vega spec. Currently the only Vega fields are 'x' and 'y'.
         **kwargs: Keyword arguments passed to wandb.plot_table(string_fields=kwargs).
+
+    Raises:
+        ValueError: If 'fields' does not contain 'x' and 'y' keys.
     """
     if set(fields) < {"x", "y"}:
         raise ValueError(f"{fields=} must specify x=str and y=str column names")

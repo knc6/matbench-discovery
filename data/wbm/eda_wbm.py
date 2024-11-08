@@ -8,25 +8,17 @@ import os
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import pymatviz as pmv
 from matplotlib.colors import SymLogNorm
 from pymatgen.core import Composition, Structure
-from pymatviz import (
-    count_elements,
-    ptable_heatmap,
-    ptable_heatmap_plotly,
-    ptable_heatmap_ratio,
-    spacegroup_sunburst,
-)
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
-from pymatviz.structure_viz import plot_structure_2d
-from pymatviz.utils import PLOTLY, si_fmt, si_fmt_int
+from pymatviz.utils import PLOTLY, si_fmt_int
 
 from matbench_discovery import PDF_FIGS, ROOT, SITE_FIGS, STABILITY_THRESHOLD
 from matbench_discovery import plots as plots
 from matbench_discovery.data import DataFiles, df_wbm
 from matbench_discovery.energy import mp_elem_ref_entries
-from matbench_discovery.enums import MbdKey, Model
+from matbench_discovery.enums import MbdKey
 from matbench_discovery.preds import df_each_err
 
 __author__ = "Janosh Riebesell"
@@ -37,19 +29,21 @@ data_page = f"{ROOT}/site/src/routes/data"
 
 
 # %% load MP training set
-df_mp = pd.read_csv(DataFiles.mp_energies.path, na_filter=False, na_values=[])
-
-df_mp[df_mp[Key.formula].isna()]
+df_mp = pd.read_csv(DataFiles.mp_energies.path, na_filter=False)
+df_mp = df_mp.set_index(Key.mat_id)
 
 
 # %%
-wbm_occu_counts = count_elements(df_wbm[Key.formula], count_mode="occurrence").astype(
-    int
-)
-wbm_comp_counts = count_elements(df_wbm[Key.formula], count_mode="composition")
+wbm_occu_counts = pmv.count_elements(df_wbm[Key.formula], count_mode="occurrence")
+wbm_occu_counts = wbm_occu_counts.dropna().astype(int)
+wbm_comp_counts = pmv.count_elements(df_wbm[Key.formula], count_mode="composition")
+wbm_comp_counts = wbm_comp_counts.dropna().astype(int)
 
-mp_occu_counts = count_elements(df_mp[Key.formula], count_mode="occurrence").astype(int)
-mp_comp_counts = count_elements(df_mp[Key.formula], count_mode="composition")
+mp_occu_counts = pmv.count_elements(df_mp[Key.formula], count_mode="occurrence")
+mp_occu_counts = mp_occu_counts.dropna().astype(int)
+
+mp_comp_counts = pmv.count_elements(df_mp[Key.formula], count_mode="composition")
+mp_comp_counts = mp_comp_counts.dropna().astype(int)
 
 all_counts = (
     ("wbm", "occurrence", wbm_occu_counts),
@@ -80,28 +74,25 @@ for dataset, count_mode, elem_counts in all_counts:
     elem_counts.to_json(f"{data_page}/{filename}.json")
 
     title = f"Number of {dataset.upper()} structures containing each element"
-    fig = ptable_heatmap_plotly(elem_counts, font_size=10)
+    fig = pmv.ptable_heatmap_plotly(elem_counts, font_size=10, fmt=",.0f")
     fig.layout.title.update(text=title, x=0.4, y=0.9)
     fig.show()
 
-    ax_mp_cnt = ptable_heatmap(  # matplotlib version looks better for SI
+    # saving matplotlib heatmap to PDF mostly for historical reasons, could also use
+    # pmv.ptable_heatmap_plotly
+    ax_elem_counts = pmv.ptable_heatmap(
         elem_counts,
-        fmt=lambda x, _: si_fmt(x, ".0f"),
-        cbar_fmt=lambda x, _: si_fmt(x, ".0f"),
-        zero_color="#efefef",
-        label_font_size=17,
-        value_font_size=14,
         cbar_title=f"{dataset.upper()} Element Count",
         log=(log := SymLogNorm(linthresh=100)),
     )
     if log:
         filename += "-symlog" if isinstance(log, SymLogNorm) else "-log"
-    save_fig(ax_mp_cnt, f"{PDF_FIGS}/{filename}.pdf")
+    pmv.save_fig(ax_elem_counts, f"{PDF_FIGS}/{filename}.pdf")
 
 
 # %% ratio of WBM to MP counts
 normalized = True
-ax_ptable = ptable_heatmap_ratio(
+ax_ptable = pmv.ptable_heatmap_ratio(
     wbm_occu_counts / (len(df_wbm) if normalized else 1),
     mp_occu_counts / (len(df_mp) if normalized else 1),
     zero_color="#efefef",
@@ -110,14 +101,14 @@ ax_ptable = ptable_heatmap_ratio(
 img_name = "wbm-mp-ratio-element-counts-by-occurrence"
 if normalized:
     img_name += "-normalized"
-save_fig(ax_ptable, f"{PDF_FIGS}/{img_name}.pdf")
+pmv.save_fig(ax_ptable, f"{PDF_FIGS}/{img_name}.pdf")
 
 
 # %% export element counts by WBM step to JSON
 df_wbm["step"] = df_wbm.index.str.split("-").str[1].astype(int)
 assert df_wbm.step.between(1, 5).all()
 for batch in range(1, 6):
-    count_elements(df_wbm[df_wbm.step == batch][Key.formula]).to_json(
+    pmv.count_elements(df_wbm[df_wbm.step == batch][Key.formula]).to_json(
         f"{data_page}/wbm-element-counts-{batch=}.json"
     )
 
@@ -125,14 +116,14 @@ for batch in range(1, 6):
 df_wbm[Key.composition] = df_wbm[Key.formula].map(Composition)
 
 for arity, df_mp in df_wbm.groupby(df_wbm[Key.composition].map(len)):
-    count_elements(df_mp[Key.formula]).to_json(
+    pmv.count_elements(df_mp[Key.formula]).to_json(
         f"{data_page}/wbm-element-counts-{arity=}.json"
     )
 
 
 # %%
 for dataset, count_mode, elem_counts in all_counts:
-    fig = ptable_heatmap_plotly(
+    fig = pmv.ptable_heatmap_plotly(
         elem_counts.drop("Xe")[elem_counts > 1],
         font_size=11,
         color_bar=dict(title=dict(text=f"WBM {count_mode} counts", font_size=24)),
@@ -144,8 +135,8 @@ for dataset, count_mode, elem_counts in all_counts:
     fig.layout.margin = dict(l=0, r=0, b=0, t=0)
     fig.show()
     svg_path = f"{module_dir}/figs/wbm-elements.svg"
-    # save_fig(fig, svg_path, width=1000, height=500)
-    save_fig(fig, f"{PDF_FIGS}/{dataset}-element-{count_mode}-counts.pdf")
+    # pmv.save_fig(fig, svg_path, width=1000, height=500)
+    pmv.save_fig(fig, f"{PDF_FIGS}/{dataset}-element-{count_mode}-counts.pdf")
 
 
 # %% histogram of energy distance to MP convex hull for WBM
@@ -221,9 +212,9 @@ suffix = {
     MbdKey.e_form_raw: "e-form-uncorrected",
 }[e_col]
 img_name = f"hist-wbm-{suffix}"
-save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
-# save_fig(fig, f"./figs/{img_name}.svg", width=800, height=500)
-save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=600, height=300)
+pmv.save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
+# pmv.save_fig(fig, f"./figs/{img_name}.svg", width=800, height=500)
+pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=600, height=300)
 
 
 # %%
@@ -257,8 +248,8 @@ for symbol, e_per_atom, num, *_ in df_ref.itertuples(index=False):
 
 fig.show()
 
-save_fig(fig, f"{SITE_FIGS}/mp-elemental-ref-energies.svelte")
-save_fig(fig, f"{PDF_FIGS}/mp-elemental-ref-energies.pdf")
+pmv.save_fig(fig, f"{SITE_FIGS}/mp-elemental-ref-energies.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/mp-elemental-ref-energies.pdf")
 
 
 # %% plot 2d and 3d t-SNE projections of one-hot encoded element vectors summed by
@@ -270,11 +261,6 @@ df_2d_tsne = pd.read_csv(f"{module_dir}/tsne/one-hot-112-composition-2d.csv.gz")
 df_2d_tsne = df_2d_tsne.set_index(Key.mat_id)
 
 df_3d_tsne = pd.read_csv(f"{module_dir}/tsne/one-hot-112-composition-3d.csv.gz")
-model = Model.wrenformer
-df_3d_tsne = pd.read_csv(
-    f"{module_dir}/tsne/one-hot-112-composition+{model}-each-err-3d-metric=eucl.csv.gz"
-)
-df_3d_tsne = df_3d_tsne.set_index(Key.mat_id)
 
 df_wbm[list(df_2d_tsne)] = df_2d_tsne
 df_wbm[list(df_3d_tsne)] = df_3d_tsne
@@ -282,19 +268,13 @@ df_wbm[list(df_each_err.add_suffix(" abs EACH error"))] = df_each_err.abs()
 
 
 # %%
-color_col = f"{model} abs EACH error"
-clr_range_max = df_wbm[color_col].mean() + df_wbm[color_col].std()
-
-
-# %%
 fig = px.scatter(
     df_wbm,
     x="2d t-SNE 1",
     y="2d t-SNE 2",
-    color=color_col,
+    color="step",
     hover_name=Key.mat_id,
     hover_data=(Key.formula, MbdKey.each_true),
-    range_color=(0, clr_range_max),
 )
 fig.show()
 
@@ -305,45 +285,44 @@ fig = px.scatter_3d(
     x="3d t-SNE 1",
     y="3d t-SNE 2",
     z="3d t-SNE 3",
-    color=color_col,
-    custom_data=[Key.mat_id, Key.formula, MbdKey.each_true, color_col],
-    range_color=(0, clr_range_max),
+    color="step",
+    custom_data=[Key.mat_id, Key.formula, MbdKey.each_true],
 )
 fig.data[0].hovertemplate = (
     "<b>material_id: %{customdata[0]}</b><br><br>"
     "t-SNE: (%{x:.2f}, %{y:.2f}, %{z:.2f})<br>"
     "Formula: %{customdata[1]}<br>"
     "E<sub>above hull</sub>: %{customdata[2]:.2f}<br>"
-    f"{color_col}: %{{customdata[3]:.2f}}<br>"
+    "WBM step: %{customdata[3]:.2f}<br>"
 )
 fig.show()
 
 
 # %%
 df_wbm[Key.spg_num] = df_wbm[MbdKey.init_wyckoff].str.split("_").str[2].astype(int)
-df_mp[Key.spg_num] = df_mp[Key.wyckoff].str.split("_").str[2].astype(int)
+df_mp[Key.spg_num] = df_mp[f"{Key.wyckoff}_spglib"].str.split("_").str[2].astype(int)
 
 
 # %%
-fig = spacegroup_sunburst(
+fig = pmv.spacegroup_sunburst(
     df_wbm[Key.spg_num], width=350, height=350, show_counts="percent"
 )
 fig.layout.title.update(text="WBM Spacegroup Sunburst", x=0.5, font_size=14)
 fig.layout.margin = dict(l=0, r=0, t=30, b=0)
 fig.show()
-save_fig(fig, f"{SITE_FIGS}/spacegroup-sunburst-wbm.svelte")
-save_fig(fig, f"{PDF_FIGS}/spacegroup-sunburst-wbm.pdf")
+pmv.save_fig(fig, f"{SITE_FIGS}/spacegroup-sunburst-wbm.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/spacegroup-sunburst-wbm.pdf")
 
 
 # %%
-fig = spacegroup_sunburst(
+fig = pmv.spacegroup_sunburst(
     df_mp[Key.spg_num], width=350, height=350, show_counts="percent"
 )
 fig.layout.title.update(text="MP Spacegroup Sunburst", x=0.5, font_size=14)
 fig.layout.margin = dict(l=0, r=0, t=30, b=0)
 fig.show()
-save_fig(fig, f"{SITE_FIGS}/spacegroup-sunburst-mp.svelte")
-save_fig(fig, f"{PDF_FIGS}/spacegroup-sunburst-mp.pdf")
+pmv.save_fig(fig, f"{SITE_FIGS}/spacegroup-sunburst-mp.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/spacegroup-sunburst-mp.pdf")
 # would be good to have consistent order of crystal systems between sunbursts but not
 # controllable yet
 # https://github.com/plotly/plotly.py/issues/4115
@@ -371,22 +350,21 @@ fig.layout.xaxis.title = "Number of Elements in Formula"
 
 fig.show()
 img_name = "mp-vs-wbm-arity-hist"
-save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
-save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=450, height=280)
+pmv.save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=450, height=280)
 
 
 # %% find large structures that changed symmetry during relaxation
 df_sym_change = (
-    df_wbm.query(f"{MbdKey.init_wyckoff} != {Key.wyckoff}")
+    df_wbm.query(f"{MbdKey.init_wyckoff} != {Key.wyckoff}_spglib")
     .filter(regex="wyckoff|sites")
     .nlargest(10, Key.n_sites)
 )
 
 
 # %%
-df_wbm_structs = pd.read_json(DataFiles.wbm_cses_plus_init_structs.path).set_index(
-    Key.mat_id
-)
+df_wbm_structs = pd.read_json(DataFiles.wbm_cses_plus_init_structs.path)
+df_wbm_structs = df_wbm_structs.set_index(Key.mat_id)
 
 
 # %%
@@ -396,7 +374,7 @@ for wbm_id in df_sym_change.index:
     init_struct.properties[Key.mat_id] = f"{wbm_id}-init"
     final_struct.properties[Key.mat_id] = f"{wbm_id}-final"
 
-    plot_structure_2d([init_struct, final_struct])
+    pmv.structure_2d([init_struct, final_struct])
 
 
 # %% export initial and final structures with symmetry change to CIF

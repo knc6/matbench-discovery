@@ -9,8 +9,8 @@ will provide the best hit rate for the given budget.
 
 # %%
 import pandas as pd
+import pymatviz as pmv
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 from pymatviz.utils import MATPLOTLIB, PLOTLY
 
 from matbench_discovery import PDF_FIGS, SITE_FIGS
@@ -22,7 +22,7 @@ __author__ = "Janosh Riebesell, Rhys Goodall"
 __date__ = "2022-12-04"
 
 
-test_subset = globals().get("test_subset", TestSubset.full)
+test_subset = globals().get("test_subset", TestSubset.uniq_protos)
 
 if test_subset == TestSubset.uniq_protos:
     df_preds = df_preds.query(Key.uniq_proto)
@@ -129,5 +129,5 @@ fig.show()
 
 # %%
 img_name = f"cumulative-{'-'.join(metrics).lower()}"
-save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
-save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=1000, height=400)
+pmv.save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=1000, height=400)

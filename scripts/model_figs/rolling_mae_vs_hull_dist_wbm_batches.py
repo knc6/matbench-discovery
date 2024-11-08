@@ -3,13 +3,15 @@ batch in a single plot.
 """
 
 # %%
+import matplotlib.pyplot as plt
+import pymatviz as pmv
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 from pymatviz.utils import MATPLOTLIB, PLOTLY
 
 from matbench_discovery import PDF_FIGS, SITE_FIGS, today
-from matbench_discovery.enums import MbdKey, Model, TestSubset
-from matbench_discovery.plots import plt, rolling_mae_vs_hull_dist
+from matbench_discovery.data import Model
+from matbench_discovery.enums import MbdKey, TestSubset
+from matbench_discovery.plots import rolling_mae_vs_hull_dist
 from matbench_discovery.preds import df_each_pred, df_preds
 from matbench_discovery.preds import models as all_models
 
@@ -22,7 +24,7 @@ df_err, df_std = None, None  # variables to cache rolling MAE and std
 models = globals().get("models", all_models)
 
 
-test_subset = globals().get("test_subset", TestSubset.full)
+test_subset = globals().get("test_subset", TestSubset.uniq_protos)
 
 if test_subset == TestSubset.uniq_protos:
     df_preds = df_preds.query(Key.uniq_proto)
@@ -42,8 +44,15 @@ for model in models:
         show_dummy_mae=False,
         with_sem=False,
     )
+    # if error is low, move legend to the top left
+    leg_y = 1 if df_err.max().max() < 0.1 else 0.02
+    y_anchor = "top" if leg_y == 1 else "bottom"
     fig.layout.legend.update(
-        title=f"<b>{model}</b>", x=0.02, y=0.02, bgcolor="rgba(0,0,0,0)"
+        title=f"<b>{model}</b>",
+        x=0.02,
+        y=leg_y,
+        bgcolor="rgba(0,0,0,0)",
+        yanchor=y_anchor,
     )
     fig.layout.margin.update(l=10, r=10, b=10, t=10)
     fig.layout.update(hovermode="x unified", hoverlabel_bgcolor="black")
@@ -55,8 +64,8 @@ for model in models:
 
     model_snake_case = model.lower().replace(" + ", "-").replace(" ", "-")
     img_path = f"rolling-mae-vs-hull-dist-wbm-batches-{model_snake_case}"
-    save_fig(fig, f"{SITE_FIGS}/{img_path}.svelte")
-    save_fig(fig, f"{PDF_FIGS}/{img_path}.pdf", width=500, height=330)
+    pmv.save_fig(fig, f"{SITE_FIGS}/{img_path}.svelte")
+    pmv.save_fig(fig, f"{PDF_FIGS}/{img_path}.pdf", width=500, height=330)
 
 
 # %% matplotlib version
@@ -66,7 +75,7 @@ if len(markers) != 5:
     raise ValueError("Need 5 markers for 5 batches")
     # number of iterations of element substitution in WBM data set
 
-model = Model.chgnet
+model = Model.chgnet.label
 
 for idx, marker in enumerate(markers, start=1):
     # select all rows from WBM step=idx

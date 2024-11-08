@@ -43,6 +43,7 @@ properties:
   doi: *url
   paper: *url
   url: *url
+  pypi: *url
   requirements:
     type: object
     patternProperties:
@@ -51,18 +52,18 @@ properties:
   trained_for_benchmark:
     type: boolean
   training_set:
-    type: object
-    properties:
-      title:
-        type: string
-      url:
-        type: string
-        format: uri
-      n_structures:
-        type: number
-      n_materials:
-        type: number
-    required: [title, url, n_structures]
+    type: array
+    items:
+      enum: &training_sets
+        - MP 2022
+        - MPtrj
+        - MPF
+        - MP Graphs
+        - GNoME
+        - MatterSim
+        - Alex
+        - OMat24
+        - sAlex
   hyperparams:
     type: object
     properties:
@@ -87,17 +88,17 @@ properties:
   notes:
     type: object
     properties:
-      description:
+      Description:
         type: string
-      training:
+      Training:
         oneOf:
           - type: string
           - type: object
-            values:
+            additionalProperties:
               type: string
-      missing_preds:
+      Missing Preds:
         type: string
-      additionalProperties: true
+    additionalProperties: true
   model_params:
     type: number
     minimum: 0
@@ -127,10 +128,89 @@ properties:
     enum: [GNN, UIP, BO-GNN, Fingerprint, Transformer, RF]
   targets:
     type: string
-    enum: [E, EF, EFS, EFSM]
+    enum: [E, EF_C, EF_D, EFS_C, EFS_D, EFS_CM, EFS_DM]
   openness:
     type: string
     enum: [OSOD, OSCD, CSOD, CSCD]
+  status:
+    type: string
+    enum: [aborted, complete]
+  metrics:
+    type: object
+    additionalProperties: false
+    properties:
+      phonons:
+        oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              κ_SRME:
+                type: number
+          - type: string
+            enum: [not applicable, not available]
+      geo_opt:
+        oneOf:
+          - type: object
+            additionalProperties: false
+            properties:
+              pred_file:
+                type: [string, "null"]
+              pred_col:
+                type: [string, "null"]
+          - type: string
+            enum: [not applicable, not available]
+      discovery:
+        additionalProperties: false
+        type: object
+        properties:
+          additionalProperties: false
+          pred_file:
+            type: string
+          pred_col:
+            type: string
+          full_test_set: &discovery_metrics
+            type: object
+            additionalProperties: false
+            properties:
+              F1:
+                type: number
+              DAF:
+                type: number
+              Precision:
+                type: number
+              Recall:
+                type: number
+              Accuracy:
+                type: number
+              TPR:
+                type: number
+              FPR:
+                type: number
+              TNR:
+                type: number
+              FNR:
+                type: number
+              TP:
+                type: number
+              FP:
+                type: number
+              TN:
+                type: number
+              FN:
+                type: number
+              MAE:
+                type: number
+              RMSE:
+                type: number
+              R2:
+                type: number
+              missing_preds:
+                type: number
+              missing_percent:
+                type: string
+          most_stable_10k: *discovery_metrics
+          unique_prototypes: *discovery_metrics
+
 required:
   - authors
   - date_added

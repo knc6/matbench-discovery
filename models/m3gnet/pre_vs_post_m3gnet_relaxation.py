@@ -5,11 +5,10 @@ import os
 
 import pandas as pd
 import plotly.express as px
+import pymatviz as pmv
 from pymatgen.core import Structure
 from pymatgen.util.coord import pbc_diff
-from pymatviz import density_scatter
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 from pymatviz.powerups import add_identity_line
 from sklearn.metrics import r2_score
 
@@ -70,7 +69,7 @@ df_wbm.query("initial_wbm_volume.isna()").index.tolist()
 
 
 # %% parity plot of M3GNet/initial volumes vs DFT-relaxed volumes
-ax = density_scatter(
+ax = pmv.density_scatter(
     df=df_wbm.query("m3gnet_volume < 2000"),
     x="final_wbm_volume",
     y="m3gnet_volume",
@@ -78,7 +77,7 @@ ax = density_scatter(
     alpha=0.5,
     stats=dict(loc="lower right", prefix="m3gnet to final (red)\n"),
 )
-density_scatter(
+pmv.density_scatter(
     df=df_wbm.query("m3gnet_volume < 2000"),
     x="final_wbm_volume",
     y="initial_wbm_volume",
@@ -90,7 +89,7 @@ density_scatter(
 ax.set(title="M3GNet-relaxed vs DFT-relaxed WBM volumes")
 ax.set(xlabel="DFT-relaxed volume [Å³]")
 ax.set(ylabel="M3GNet-relaxed / unrelaxed volume [Å³]")
-save_fig(ax, f"{SITE_FIGS}/m3gnet-wbm-volume-scatter.webp", dpi=200)
+pmv.save_fig(ax, f"{SITE_FIGS}/m3gnet-wbm-volume-scatter.webp", dpi=200)
 
 
 # %% histogram of M3GNet-relaxed vs initial WBM volume residuals wrt DFT-relaxed volume

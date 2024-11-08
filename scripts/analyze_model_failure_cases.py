@@ -10,10 +10,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
+import pymatviz as pmv
 from pymatgen.core import Composition, Structure
-from pymatviz import count_elements, plot_structure_2d, ptable_heatmap_plotly
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 from pymatviz.utils import PLOTLY
 from tqdm import tqdm
 
@@ -58,7 +57,7 @@ for good_or_bad, init_or_final in itertools.product(
         if "structure" in struct:
             struct = struct["structure"]
         struct = Structure.from_dict(struct)
-        ax = plot_structure_2d(struct, ax=axs.flat[idx - 1])
+        ax = pmv.structure_2d(struct, ax=axs.flat[idx - 1])
         _, spg_num = struct.get_space_group_info()
         formula = struct.composition.reduced_formula
         ax_title = f"{idx}. {formula} (spg={spg_num})\n{mat_id} {error=:.2f}"
@@ -101,7 +100,7 @@ fig.layout.yaxis.title = "Count"
 
 fig.show()
 
-# save_fig(fig, f"{FIGS}/hist-largest-each-errors-fp-diff-models.svelte")
+# pmv.save_fig(fig, f"{FIGS}/hist-largest-each-errors-fp-diff-models.svelte")
 
 
 # %%
@@ -139,15 +138,15 @@ fig.layout.yaxis.title = "Absolute error (eV/atom)"
 
 fig.show()
 
-# save_fig(fig, f"{FIGS}/scatter-largest-each-errors-fp-diff-models.svelte")
+# pmv.save_fig(fig, f"{FIGS}/scatter-largest-each-errors-fp-diff-models.svelte")
 
 
 # %%
 df_mp = pd.read_csv(DataFiles.mp_energies.path, na_filter=False).set_index(Key.mat_id)
 train_count_col = "MP Occurrences"
-df_elem_counts = count_elements(df_mp[Key.formula], count_mode="occurrence").to_frame(
-    name=train_count_col
-)
+df_elem_counts = pmv.count_elements(
+    df_mp[Key.formula], count_mode="occurrence"
+).to_frame(name=train_count_col)
 n_examp_for_rarest_elem_col = "Examples for rarest element in structure"
 df_wbm[n_examp_for_rarest_elem_col] = [
     df_elem_counts[train_count_col].loc[list(map(str, Composition(formula)))].min()
@@ -180,9 +179,9 @@ normalized = True
 elem_counts: dict[str, pd.Series] = {}
 for col in ("All models false neg", "All models false pos"):
     elem_counts[col] = elem_counts.get(
-        col, count_elements(df_preds[df_preds[col]][Key.formula])
+        col, pmv.count_elements(df_preds[df_preds[col]][Key.formula])
     )
-    fig = ptable_heatmap_plotly(
+    fig = pmv.ptable_heatmap_plotly(
         elem_counts[col] / df_elem_counts[train_count_col]
         if normalized
         else elem_counts[col],
@@ -197,21 +196,14 @@ for col in ("All models false neg", "All models false pos"):
 
 # %% map abs EACH model errors onto elements in structure weighted by composition
 # fraction and average over all test set structures
-frac_comp_col = "fractional composition"
-df_wbm[frac_comp_col] = [
-    Composition(comp).fractional_composition for comp in tqdm(df_wbm[Key.formula])
-]
-
-df_frac_comp = pd.json_normalize(
-    [comp.as_dict() for comp in df_wbm[frac_comp_col]]
+df_comp = pd.json_normalize(
+    [Composition(comp).as_dict() for comp in tqdm(df_wbm[Key.formula])]
 ).set_index(df_wbm.index)
-if any(df_frac_comp.sum(axis=1).round(6) != 1):
-    raise ValueError("Sum of fractional compositions is not 1")
 
 # bar plot showing number of structures in MP containing each element
-(len(df_frac_comp) - df_frac_comp.isna().sum()).sort_values().plot.bar(backend=PLOTLY)
+(len(df_comp) - df_comp.isna().sum()).sort_values().plot.bar(backend=PLOTLY)
 
-# df_frac_comp = df_frac_comp.dropna(axis=1, thresh=100)  # remove Xe with only 1 entry
+# df_comp = df_comp.dropna(axis=1, thresh=100)  # remove Xe with only 1 entry
 
 
 # %% TODO investigate if structures with largest mean error across all models error can
@@ -291,8 +283,8 @@ fig.show()
 
 
 # %%
-save_fig(fig, f"{SITE_FIGS}/largest-fp-diff-each-error-models.svelte")
-save_fig(fig, f"{PDF_FIGS}/large-fp-diff-vs-each-error.pdf")
+pmv.save_fig(fig, f"{SITE_FIGS}/largest-fp-diff-each-error-models.svelte")
+pmv.save_fig(fig, f"{PDF_FIGS}/large-fp-diff-vs-each-error.pdf")
 
 
 # %%
@@ -314,7 +306,7 @@ fig = px.scatter(
 )
 fig.show()
 
-save_fig(fig, f"{PDF_FIGS}/tsne-2d-composition-by-wbm-step-bandgap.png", scale=3)
+pmv.save_fig(fig, f"{PDF_FIGS}/tsne-2d-composition-by-wbm-step-bandgap.png", scale=3)
 
 
 # %% violin plot of EACH error for largest norm-diff FP structures for each model

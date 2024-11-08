@@ -14,12 +14,13 @@ authors:
 trained_by:
   - name: Philipp Benner
     affiliation: German Federal Institute of Materials Research and Testing (BAM)
-    orcid: 0000-0002-0912-8137
+    orcid: https://orcid.org/0000-0002-0912-8137
     github: https://github.com/pbenner
 repo: https://github.com/usnistgov/alignn
 url: https://jarvis.nist.gov/jalignn
 doi: https://nature.com/articles/s41524-021-00650-1
 paper: https://arxiv.org/abs/2106.01829
+pypi: https://pypi.org/project/alignn
 
 requirements:
   ase: 3.22.0
@@ -36,14 +37,75 @@ train_task: RS2RE
 test_task: IS2E
 targets: E
 model_params: 4_026_753 # pre-trained 'mp_e_form_alignn' and our custom MBD checkpoint have the same size
-# other hyperparams: see align-config.json
+# for other hyperparams, see alignn-config.json
 n_estimators: 1
 
-training_set: # model trained from specifically for MBD
-  title: MP v2022.10.28
-  url: https://figshare.com/ndownloader/files/40344436
-  n_structures: 154_719
-# training_set: # NIST pre-trained model
-#   title: Graphs of MP
-#   url: https://figshare.com/articles/dataset/7451351
-#   n_structures: 69_239
+# model trained from specifically for MBD
+training_set: [MP 2022]
+
+metrics:
+  phonons: not available # model doesn't predict forces
+  geo_opt: not available
+  discovery:
+    pred_file: models/alignn/2023-06-02-alignn-wbm-IS2RE.csv.gz
+    pred_col: e_form_per_atom_alignn
+    full_test_set:
+      F1: 0.565
+      DAF: 2.921
+      Precision: 0.501
+      Recall: 0.649
+      Accuracy: 0.829
+      TPR: 0.649
+      FPR: 0.134
+      TNR: 0.866
+      FNR: 0.351
+      TP: 28598.0
+      FP: 28464.0
+      TN: 184407.0
+      FN: 15494.0
+      MAE: 0.092
+      RMSE: 0.154
+      R2: 0.274
+      missing_preds: 1
+      missing_percent: 0.00%
+    most_stable_10k:
+      F1: 0.748
+      DAF: 3.905
+      Precision: 0.597
+      Recall: 1.0
+      Accuracy: 0.597
+      TPR: 1.0
+      FPR: 1.0
+      TNR: 0.0
+      FNR: 0.0
+      TP: 5969.0
+      FP: 4031.0
+      TN: 0.0
+      FN: 0.0
+      MAE: 0.176
+      RMSE: 0.247
+      R2: 0.081
+      missing_preds: 0
+      missing_percent: 0.00%
+    unique_prototypes:
+      F1: 0.567
+      DAF: 3.206
+      Precision: 0.49
+      Recall: 0.672
+      Accuracy: 0.841
+      TPR: 0.672
+      FPR: 0.128
+      TNR: 0.872
+      FNR: 0.328
+      TP: 22436.0
+      FP: 23346.0
+      TN: 158768.0
+      FN: 10938.0
+      MAE: 0.093
+      RMSE: 0.154
+      R2: 0.297
+      missing_preds: 0
+      missing_percent: 0.00%
+# model pre-trained by NIST (not shown in MBD since performed worse)
+# training_set:
+#   title: MP Graphs

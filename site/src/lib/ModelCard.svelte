@@ -1,33 +1,38 @@
 <script lang="ts">
   import type { ModelData, ModelStatLabel } from '$lib'
   import { AuthorBrief } from '$lib'
+  import TRAINING_SETS from '$root/data/training-sets.yml'
   import { repository } from '$site/package.json'
   import Icon from '@iconify/svelte'
   import { pretty_num } from 'elementari'
   import { Tooltip } from 'svelte-zoo'
   import { fade, slide } from 'svelte/transition'
 
-  export let data: ModelData
-  export let stats: ModelStatLabel[] // [key, label, unit][]
+  export let model: ModelData
+  export let stats: ModelStatLabel[]
   export let sort_by: keyof ModelData
   export let show_details: boolean = false
   export let style: string | null = null
   export let metrics_style: string | null = null
 
-  $: ({ model_name, missing_preds, missing_percent } = data)
-  $: ({ model_params, hyperparams, notes = {}, training_set, n_estimators } = data)
+  $: ({ model_name } = model)
+  $: ({ model_params, hyperparams, notes = {}, training_set, n_estimators } = model)
+  $: discovery_metrics = model.metrics?.discovery?.full_test_set ?? {}
+  $: ({ missing_preds, missing_percent } = discovery_metrics)
 
   $: links = [
-    [data.repo, `Repo`, `octicon:mark-github`],
-    [data.paper, `Paper`, `ion:ios-paper`],
-    [data.url, `Docs`, `ion:ios-globe`],
-    [`${repository}/blob/-/models/${data.dirname}`, `Files`, `octicon:file-directory`],
+    [model.repo, `Repo`, `octicon:mark-github`],
+    [model.paper, `Paper`, `ion:ios-paper`],
+    [model.url, `Docs`, `ion:ios-globe`],
+    [`${repository}/blob/-/models/${model.dirname}`, `Files`, `octicon:file-directory`],
   ]
   const target = { target: `_blank`, rel: `noopener` }
+  $: model_slug = model_name?.toLowerCase().replaceAll(` `, `-`) ?? ``
+  $: n_model_params = pretty_num(model_params, `.3~s`)
 </script>
 
-<h2 id={model_name.toLowerCase().replaceAll(` `, `-`)} {style}>
-  {model_name}
+<h2 id={model_slug} {style}>
+  <a href="/models/{model_slug}">{model_name}</a>
   <button
     on:click={() => (show_details = !show_details)}
     title="{show_details ? `Hide` : `Show`} authors and package versions"
@@ -47,29 +52,26 @@
 <p>
   <span title="Date added">
     <Icon icon="ion:ios-calendar" inline />
-    Added {data.date_added}
+    Added {model.date_added}
   </span>
-  {#if data.date_published}
+  {#if model.date_published}
     <span title="Date published">
       <Icon icon="ri:calendar-check-line" inline />
-      Published {data.date_published}
+      Published {model.date_published}
     </span>
   {/if}
   <span>
     <Icon icon="eos-icons:neural-network" inline />
-    {pretty_num(model_params, `.3~s`)} params
+    {n_model_params} params
   </span>
   {#if n_estimators > 1}
     <span>
       <Icon icon="material-symbols:forest" inline />
       Ensemble of {n_estimators > 1 ? `${n_estimators}` : ``}
       <Tooltip
-        icon="ion:information-circle"
-        text="This result used a model ensemble with {n_estimators} members with {pretty_num(
-          model_params,
-          `.3~s`,
-        )} parameters."
-        ><Icon icon="ion:information-circle" inline />
+        text="This result used a model ensemble with {n_estimators} members with {n_model_params} parameters each."
+      >
+        <Icon icon="ion:information-circle" inline />
       </Tooltip>
     </span>
   {/if}
@@ -90,17 +92,27 @@
     {/if}
   </span>
   {#if training_set}
-    {@const { n_structures, url, title, n_materials } = training_set}
-    {@const pretty_n_mat =
-      typeof n_materials == `number` ? pretty_num(n_materials) : n_materials}
-    {@const n_mat_str = n_materials ? ` from ${pretty_n_mat} materials` : ``}
+    {@const training_sets = Array.isArray(training_set) ? training_set : [training_set]}
     <span style="grid-column: span 2;">
       <Icon icon="mdi:database" inline />
       Training set:
-      <a href={url}>{title}</a>
-      <small>
-        ({pretty_num(n_structures)} structures{n_mat_str})
-      </small>
+      {#each training_sets as training_set_or_key, idx}
+        {#if idx > 0}
+          &nbsp;+&nbsp;
+        {/if}
+        {@const training_set =
+          typeof training_set_or_key == `string`
+            ? TRAINING_SETS[training_set_or_key]
+            : training_set_or_key}
+        {@const { n_structures, url, title, n_materials } = training_set}
+        {@const pretty_n_mat =
+          typeof n_materials == `number` ? pretty_num(n_materials) : n_materials}
+        {@const n_mat_str = n_materials ? ` from ${pretty_n_mat} materials` : ``}
+        <a href={url}>{title}</a>
+        <small>
+          ({pretty_num(n_structures)} structures{n_mat_str})
+        </small>
+      {/each}
     </span>
   {/if}
 </p>
@@ -109,16 +121,16 @@
     <section transition:slide={{ duration: 200 }}>
       <h3>Authors</h3>
       <ul>
-        {#each data.authors as author (author.name)}
+        {#each model.authors as author (author.name)}
           <li>
             <AuthorBrief {author} />
           </li>
         {/each}
       </ul>
-      {#if data.trained_by}
+      {#if model.trained_by}
         <h3>Trained By</h3>
         <ul>
-          {#each data.trained_by as author (author.name)}
+          {#each model.trained_by as author (author.name)}
             <li>
               <AuthorBrief {author} />
             </li>
@@ -126,17 +138,19 @@
         </ul>
       {/if}
     </section>
-    <section transition:slide={{ duration: 200 }}>
+    <section
+      transition:slide={{ duration: 200 }}
+      style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis;"
+    >
       <h3>Package versions</h3>
       <ul>
-        {#each Object.entries(data.requirements ?? {}) as [name, version]}
+        {#each Object.entries(model.requirements ?? {}) as [name, version]}
+          {@const [href, link_text] = version.startsWith(`http`)
+            ? // version.split(`/`).at(-1) assumes final part after / of URL is the package version, as is the case for GitHub releases
+              [version, version.split(`/`).at(-1)]
+            : [`https://pypi.org/project/${name}/${version}`, version]}
           <li style="font-size: smaller;">
-            {#if ![`aviary`].includes(name)}
-              {@const href = `https://pypi.org/project/${name}/${version}`}
-              {name}: <a {href} {...target}>{version}</a>
-            {:else}
-              {name}: {version}
-            {/if}
+            {name}: <a {href} {...target}>{link_text}</a>
           </li>
         {/each}
       </ul>
@@ -146,10 +160,11 @@
 <section class="metrics" style={metrics_style}>
   <h3>Metrics</h3>
   <ul>
-    {#each stats as { key, label, unit }}
+    <!-- hide run time if value is 0 (i.e. not available) -->
+    {#each stats.filter(({ key }) => key != `Run Time (h)` || discovery_metrics[key] > 0) as { key, label, unit }}
       <li class:active={sort_by == key}>
         <label for={key}>{@html label ?? key}</label>
-        <strong>{data[key]} <small>{unit ?? ``}</small></strong>
+        <strong>{pretty_num(discovery_metrics[key])} <small>{unit ?? ``}</small></strong>
       </li>
     {/each}
   </ul>
@@ -179,7 +194,7 @@
   <section>
     <h3>Notes</h3>
     <ul>
-      {#each [`description`, `training`].filter((key) => key in (notes ?? {})) as key}
+      {#each [`Description`, `Training`].filter((key) => key in (notes ?? {})) as key}
         <li>{@html notes[key]}</li>
       {/each}
     </ul>
@@ -191,6 +206,9 @@
     margin: 8pt 0 1em;
     text-align: center;
     border-radius: 5pt;
+  }
+  h2 a {
+    color: inherit;
   }
   button {
     background: none;

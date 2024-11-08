@@ -1,5 +1,5 @@
 model_name: M3GNet
-model_version: 2022.9.20
+model_version: v2022.9.20
 matbench_discovery_version: 1.0.0
 date_added: "2022-09-20"
 date_published: "2022-02-05"
@@ -16,6 +16,7 @@ repo: https://github.com/materialsvirtuallab/m3gnet
 url: https://materialsvirtuallab.github.io/m3gnet
 doi: https://doi.org/10.1038/s43588-022-00349-3
 paper: https://arxiv.org/abs/2202.02450
+pypi: https://pypi.org/project/matgl
 
 requirements:
   m3gnet: 0.1.0
@@ -27,16 +28,10 @@ openness: OSOD
 trained_for_benchmark: false
 train_task: S2EFS
 test_task: IS2RE-SR
-targets: EFS
+targets: EFS_C
 model_type: UIP
 model_params: 227_549
 n_estimators: 1
-
-notes:
-  description: M3GNet is a GNN-based universal (as in full periodic table) interatomic potential for materials trained on up to 3-body interactions in the initial, middle and final frame of MP DFT relaxations.
-  long: It thereby learns to emulate structure relaxation, MD simulations and property prediction of materials across diverse chemical spaces.
-  training: Using pre-trained model released with paper. Was only trained on initial, middle and final frames of a subset of 62,783 MP relaxation trajectories in the 2018 database release (see [related issue](https://github.com/materialsvirtuallab/m3gnet/issues/20#issuecomment-1207087219)).
-  testing: We also tried combining M3GNet with MEGNet where M3GNet is used to relax initial structures which are then passed to MEGNet to predict the formation energy.
 
 hyperparams:
   batch_size: 32
@@ -44,8 +39,77 @@ hyperparams:
   optimizer: Adam
   loss_weights: { energy: 1, force: 1, stress: 0.1 }
 
-training_set:
-  title: MPF.2021.2.8
-  url: https://figshare.com/articles/dataset/19470599
-  n_structures: 188_349
-  n_materials: 62_783
+training_set: [MPF]
+
+notes:
+  Description: M3GNet is a GNN-based universal (as in full periodic table) interatomic potential for materials trained on up to 3-body interactions in the initial, middle and final frame of MP DFT relaxations.
+  Long: It thereby learns to emulate structure relaxation, MD simulations and property prediction of materials across diverse chemical spaces.
+  Training: Using pre-trained model released with paper. Was only trained on initial, middle and final frames of a subset of 62,783 MP relaxation trajectories in the 2018 database release (see [related issue](https://github.com/materialsvirtuallab/m3gnet/issues/20#issuecomment-1207087219)).
+  Testing: We also tried combining M3GNet with MEGNet where M3GNet is used to relax initial structures which are then passed to MEGNet to predict the formation energy.
+
+metrics:
+  phonons:
+    κ_SRME: 1.412
+  geo_opt:
+    pred_file: models/m3gnet/2023-06-01-m3gnet-manual-sampling-wbm-IS2RE.json.gz
+    pred_col: m3gnet_structure
+  discovery:
+    pred_file: models/m3gnet/2023-12-28-m3gnet-wbm-IS2RE.csv.gz
+    pred_col: e_form_per_atom_m3gnet
+    full_test_set:
+      F1: 0.576
+      DAF: 2.647
+      Precision: 0.454
+      Recall: 0.788
+      Accuracy: 0.802
+      TPR: 0.788
+      FPR: 0.196
+      TNR: 0.804
+      FNR: 0.212
+      TP: 34731.0
+      FP: 41738.0
+      TN: 171133.0
+      FN: 9361.0
+      MAE: 0.072
+      RMSE: 0.115
+      R2: 0.588
+      missing_preds: 355
+      missing_percent: 0.14%
+    most_stable_10k:
+      F1: 0.868
+      DAF: 5.02
+      Precision: 0.767
+      Recall: 1.0
+      Accuracy: 0.767
+      TPR: 1.0
+      FPR: 1.0
+      TNR: 0.0
+      FNR: 0.0
+      TP: 7674.0
+      FP: 2326.0
+      TN: 0.0
+      FN: 0.0
+      MAE: 0.101
+      RMSE: 0.158
+      R2: 0.551
+      missing_preds: 0
+      missing_percent: 0.00%
+    unique_prototypes:
+      F1: 0.569
+      DAF: 2.882
+      Precision: 0.441
+      Recall: 0.803
+      Accuracy: 0.813
+      TPR: 0.803
+      FPR: 0.187
+      TNR: 0.813
+      FNR: 0.197
+      TP: 26797.0
+      FP: 34034.0
+      TN: 148080.0
+      FN: 6577.0
+      MAE: 0.075
+      RMSE: 0.118
+      R2: 0.585
+      missing_preds: 299
+      missing_percent: 0.14%

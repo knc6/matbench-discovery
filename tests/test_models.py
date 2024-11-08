@@ -1,7 +1,11 @@
+import os
 from glob import glob
 
-from matbench_discovery import __version__
-from matbench_discovery.models import MODEL_DIRS, MODEL_METADATA
+import pytest
+
+from matbench_discovery import ROOT, __version__
+from matbench_discovery.data import Model
+from matbench_discovery.models import MODEL_DIRS, MODEL_METADATA, model_is_compliant
 
 
 def parse_version(v: str) -> tuple[int, ...]:
@@ -27,17 +31,22 @@ def test_model_dirs_have_metadata() -> None:
 
     for model_name, metadata in MODEL_METADATA.items():
         model_dir = metadata["model_dir"]
-        for key in required:
+        for key, expected in required.items():
             assert key in metadata, f"Required {key=} missing in {model_dir}"
-            if isinstance(required[key], dict):
-                missing_keys = {*required[key]} - {*metadata[key]}  # type: ignore[misc]
-                assert (
-                    not missing_keys
-                ), f"Missing sub-keys {missing_keys} of {key=} in {model_dir}"
+            actual_val = metadata[key]
+            if key == "training_set":
+                # allow either string key or dict
+                assert isinstance(actual_val, dict | str | list)
+            if (isinstance(expected, dict) and key != "training_set") or (
+                key == "training_set" and isinstance(actual_val, dict)
+            ):
+                missing_keys = {*expected} - {*actual_val}  # type: ignore[misc]
+                assert not missing_keys, f"{missing_keys=} under {key=} in {model_dir}"
                 continue
 
-            err_msg = f"Invalid {key=}, expected {required[key]} in {model_dir}"
-            assert isinstance(metadata[key], required[key]), err_msg  # type: ignore[arg-type]
+            if type(expected) is type:
+                err_msg = f"Invalid {key=}, expected {expected} in {model_dir}"
+                assert isinstance(actual_val, expected), err_msg
 
         authors, date_added, mbd_version, yml_model_name, model_version, repo = (
             metadata[key] for key in list(required)[:-1]
@@ -47,7 +56,7 @@ def test_model_dirs_have_metadata() -> None:
         # make sure all keys are valid
         for name in model_name if isinstance(model_name, list) else [model_name]:
             assert (
-                3 < len(name) < 50
+                3 <= len(name) < 50
             ), f"Invalid {name=} not between 3 and 50 characters"
         assert (
             1 < len(model_version) < 30
@@ -71,3 +80,27 @@ def test_model_dirs_have_test_scripts() -> None:
         test_scripts = glob(f"{model_dir}*test_*.py")
         test_nbs = glob(f"{model_dir}*test_*.ipynb")
         assert len(test_scripts + test_nbs) > 0, f"Missing test file in {model_dir}"
+
+
+def test_model_enum() -> None:
+    for model_key in Model:
+        model_yaml_path = f"{ROOT}/models/{model_key.url}"
+        assert os.path.isfile(model_key.path)
+        assert os.path.isfile(model_yaml_path) or model_key.url is None
+
+
+@pytest.mark.parametrize(
+    "model_key, is_compliant",
+    [
+        (Model.megnet, True),
+        (Model.eqv2_m, False),
+        (Model.eqv2_s_dens, True),
+        (Model.orb, False),
+        (Model.wrenformer, True),
+        (Model.voronoi_rf, True),
+        (Model.gnome, False),
+        (Model.mattersim, False),
+    ],
+)
+def test_model_is_compliant(model_key: Model, is_compliant: bool) -> None:
+    assert model_is_compliant(MODEL_METADATA[model_key.label]) is is_compliant

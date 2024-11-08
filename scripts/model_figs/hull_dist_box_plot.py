@@ -1,9 +1,9 @@
 # %%
 import plotly.express as px
 import plotly.graph_objects as go
+import pymatviz as pmv
 import seaborn as sns
 from pymatviz.enums import Key
-from pymatviz.io import save_fig
 
 from matbench_discovery import PDF_FIGS, SITE_FIGS
 from matbench_discovery.enums import Quantity, TestSubset
@@ -13,7 +13,7 @@ __author__ = "Janosh Riebesell"
 __date__ = "2023-05-25"
 
 
-test_subset = globals().get("test_subset", TestSubset.full)
+test_subset = globals().get("test_subset", TestSubset.uniq_protos)
 
 if test_subset == TestSubset.uniq_protos:
     df_preds = df_preds.query(Key.uniq_proto)
@@ -102,6 +102,6 @@ fig.show()
 
 
 # %%
-save_fig(fig, f"{SITE_FIGS}/box-hull-dist-errors.svelte")
+pmv.save_fig(fig, f"{SITE_FIGS}/box-hull-dist-errors.svelte")
 fig.layout.showlegend = False
-save_fig(fig, f"{PDF_FIGS}/box-hull-dist-errors.pdf")
+pmv.save_fig(fig, f"{PDF_FIGS}/box-hull-dist-errors.pdf")
