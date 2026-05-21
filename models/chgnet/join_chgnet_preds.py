@@ -14,7 +14,7 @@ from tqdm import tqdm
 from matbench_discovery.data import as_dict_handler
 from matbench_discovery.energy import get_e_form_per_atom
 from matbench_discovery.enums import MbdKey, Task
-from matbench_discovery.preds import df_preds
+from matbench_discovery.preds.discovery import df_preds
 
 __author__ = "Janosh Riebesell"
 __date__ = "2023-03-01"
@@ -52,7 +52,7 @@ df_chgnet = pd.concat(dfs.values()).round(4)
 
 # %% compute corrected formation energies
 e_pred_col = "chgnet_energy"
-e_form_chgnet_col = f"e_form_per_atom_{e_pred_col.split('_energy')[0]}"
+e_form_chgnet_col = f"e_form_per_atom_{e_pred_col.split('_energy', maxsplit=1)[0]}"
 df_chgnet[Key.formula] = df_preds[Key.formula]
 df_chgnet[e_form_chgnet_col] = [
     get_e_form_per_atom(dict(energy=ene, composition=formula))
@@ -64,19 +64,16 @@ df_preds[e_form_chgnet_col] = df_chgnet[e_form_chgnet_col]
 
 
 # %%
-ax = pmv.density_scatter_plotly(
-    df=df_preds,
-    x=MbdKey.e_form_dft,
-    y=e_form_chgnet_col,
-    template="pymatviz_white",
-)
+pmv.density_scatter(df=df_preds, x=MbdKey.e_form_dft, y=e_form_chgnet_col)
 
 
 # %%
 out_path = file_paths[0].rsplit("/", 1)[0]
 df_chgnet = df_chgnet.round(4)
 df_chgnet.select_dtypes("number").to_csv(f"{out_path}.csv.xz")
-df_chgnet.reset_index().to_json(f"{out_path}.json.xz", default_handler=as_dict_handler)
+df_chgnet.reset_index().to_json(
+    f"{out_path}.json.xz", default_handler=as_dict_handler, orient="records", lines=True
+)
 
 # in_path = f"{module_dir}/2023-03-04-chgnet-wbm-IS2RE"
 # df_chgnet = pd.read_csv(f"{in_path}.csv.gz").set_index(Key.mat_id)

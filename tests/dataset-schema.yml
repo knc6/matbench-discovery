@@ -1,0 +1,220 @@
+'$schema': http://json-schema.org/draft-07/schema#
+
+definitions:
+  # External references
+  person:
+    $ref: ./model-schema.yml#/definitions/person
+  http_url:
+    $ref: ./model-schema.yml#/definitions/http_url
+  license_enum:
+    $ref: ./model-schema.yml#/definitions/license_enum
+
+  # Dataset method and parameters
+  method_enum:
+    type: string
+    enum: [DFT, experiment, ML, GW, DMFT, MD]
+    description: Computational or experimental method used to generate the data
+
+  dft_code_enum:
+    type: string
+    enum: [VASP, Quantum ESPRESSO, CASTEP, AbInit, FHI-aims, CP2K, Various]
+    description: DFT code used for calculations
+
+  functional_enum:
+    type: string
+    enum:
+      - PBE
+      - PBEsol
+      - PBE+U
+      - SCAN
+      - SCAN+U
+      - r2SCAN
+      - r2SCAN+U
+      - HSE
+      - HSE06
+      - PBE0
+      - Various
+    description: Exchange-correlation functional used in DFT calculations
+
+  pseudo_potentials_enum:
+    type: string
+    enum: [PBE, PBE_52, PBE_54, PBE_64, Various]
+    description: Pseudopotentials used in DFT calculations
+
+  dataset:
+    name: Dataset
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - description
+      - url
+      - n_structures
+      - open
+      - license
+      - date_created
+      - doi
+    properties:
+      # Basic dataset information
+      name:
+        type: string
+        description: Full name of the dataset
+      slug:
+        type: string
+        description: Slugified name of the dataset
+        pattern: ^[a-z0-9-]+$
+        readOnly: true
+      version:
+        type: string
+        description: Version of the dataset
+      description:
+        type: string
+        format: markdown
+        description: Detailed description of the dataset
+      description_html:
+        type: string
+        format: html
+        description: HTML version of the dataset description
+      notes:
+        type: object
+        additionalProperties: true
+        # all keys should be markdown
+        patternProperties:
+          ^[a-zA-Z0-9_-]+$:
+            type: string
+            format: markdown
+            description: Note about the dataset
+
+      # Dataset size and content
+      n_structures:
+        type: integer
+        minimum: 1
+        description: Number of structures in the dataset
+      n_materials:
+        type: integer
+        minimum: 1
+        description: Number of unique materials in the dataset
+      n_stable_materials:
+        type: integer
+        minimum: 1
+        description: Number of stable materials in the dataset
+      n_uniq_stable_materials:
+        type: integer
+        minimum: 1
+        description: Number of unique stable materials in the dataset
+      elements:
+        type: array
+        items:
+          oneOf:
+            - type: string
+            - type: integer
+        description: Chemical elements included in the dataset (either symbols or atomic numbers)
+      temperature_range:
+        type: string
+        pattern: ^\d+-\d+ K$ # e.g. 0-5000 K
+        description: Temperature range of structures in the dataset (e.g., '0-5000 K')
+      pressure_range:
+        type: string
+        pattern: ^\d+-\d+ GPa$ # e.g. 0-1000 GPa
+        description: Pressure range of structures in the dataset (e.g., '0-1000 GPa')
+
+      # URLs and references
+      url:
+        $ref: '#/definitions/http_url'
+        description: Primary URL for the dataset
+      download_url:
+        $ref: '#/definitions/http_url'
+        description: URL to download the dataset
+      doi:
+        $ref: '#/definitions/http_url'
+        description: DOI reference for the dataset
+      contains:
+        type: array
+        items:
+          type: string
+        description: Other datasets this dataset contains or is derived from
+
+      # Licensing and openness
+      open:
+        type: boolean
+        description: Whether the dataset is openly available
+      static:
+        type: boolean
+        description: Whether the dataset is a static release or dynamically updated
+      compliant:
+        type: boolean
+        description: Whether the dataset is allowed for compliant model submissions
+      license:
+        $ref: '#/definitions/license_enum'
+        description: License under which the dataset is published
+
+      # APIs
+      optimade_api:
+        oneOf:
+          - type: 'null' # Allow null instead of false
+          - $ref: '#/definitions/http_url'
+        description: URL to the OPTIMADE API endpoint or null if none
+      native_api:
+        oneOf:
+          - type: 'null' # Allow null instead of false
+          - $ref: '#/definitions/http_url'
+        description: URL to the native API endpoint/documentation or null if none
+
+      # Provenance and metadata
+      created_by:
+        type: array
+        items:
+          $ref: '#/definitions/person'
+        description: People or organizations who created the dataset
+      date_created:
+        type: string
+        format: date
+        description: Date when the dataset was created
+      date_added:
+        type: string
+        format: date
+        description: Date when the dataset was added to this collection
+
+      # Computational details
+      method:
+        oneOf:
+          - $ref: '#/definitions/method_enum'
+          - type: array
+            items:
+              $ref: '#/definitions/method_enum'
+        description: Method(s) used to generate the data
+      params:
+        type: object
+        description: Parameters and methods used to generate the dataset
+        properties:
+          code:
+            oneOf:
+              - $ref: '#/definitions/dft_code_enum'
+              - type: array
+                items:
+                  $ref: '#/definitions/dft_code_enum'
+            description: DFT code(s) used for calculations
+          code_version:
+            type: string
+            description: Version of the DFT code used
+          functional:
+            oneOf:
+              - $ref: '#/definitions/functional_enum'
+              - type: array
+                items:
+                  $ref: '#/definitions/functional_enum'
+            description: Exchange-correlation functional(s) used
+          pseudopotentials:
+            oneOf:
+              - $ref: '#/definitions/pseudo_potentials_enum'
+              - type: array
+                items:
+                  $ref: '#/definitions/pseudo_potentials_enum'
+            description: Pseudopotential(s) used
+        additionalProperties: true
+
+# Main schema definition
+type: object
+patternProperties:
+  ^[a-zA-Z0-9 ]+$: # allow alphanumeric names with spaces
+    $ref: '#/definitions/dataset'

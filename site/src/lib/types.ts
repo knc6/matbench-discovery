@@ -1,38 +1,23 @@
+import * as d3sc from 'd3-scale-chromatic'
+import type { IconName } from 'matterviz'
+import type { Label1 as LabelType } from './label-schema.d.ts'
 import type { ModelMetadata } from './model-schema.d.ts'
 
-export type ModelData = ModelMetadata &
-  ModelStats & { dirname: string; metadata_file: string }
-// dirname comes from: models/{dirname}/{model_name}.yml
+export type { Dataset } from './dataset-schema.d.ts'
+export type { ModelMetadata } from './model-schema.d.ts'
 
-export type ModelStats = {
-  MAE: number // mean absolute error
-  RMSE: number // root mean squared error
-  R2: number
-  Precision: number
-  Recall: number
-  F1: number
-  missing_preds: number
-  missing_percent: number
-  Accuracy: number
-  'Run Time (h)': number
-  TPR: number // true positive rate
-  TNR: number // true negative rate
-  DAF: number // discovery acceleration factor
-  GPUs: number // number of GPUs used
-  CPUs: number // number of CPUs used
-  slurm_jobs: number // number of SLURM jobs used
-  κ_SRME: number // symmetric relative mean error for thermal conductivity
+export type ModelData = ModelMetadata & {
+  // These fields are populated in MODELS variable in models.svelte.ts
+  dirname: string
+  metadata_file: string
+  color?: string
+  n_training_materials?: number
+  n_training_structures?: number
+  org_logos?: { name: string; id?: string; src?: string; validated_icon?: IconName }[]
+  CPS?: number
 }
 
-// how to pretty print a model stat key on the website
-export type ModelStatLabel = {
-  key: keyof ModelStats
-  label?: string
-  unit?: string
-  tooltip?: string
-}
-
-export type Author = {
+export interface Author {
   name: string
   email?: string
   affiliation?: string
@@ -42,14 +27,14 @@ export type Author = {
   github?: string
 }
 
-// used in citation.cff
+// Used in citation.cff
 export type CffAuthor = Omit<Author, `name`> & {
   'family-names': string
   'given-names': string
   affil_key: string
 }
 
-export type Reference = {
+export interface Reference {
   title: string
   id: string
   author: { family: string; given: string }[]
@@ -62,7 +47,7 @@ export type Reference = {
   ISSN?: string
 }
 
-export type Citation = {
+export interface Citation {
   title: string
   subtitle?: string
   authors: CffAuthor[]
@@ -80,7 +65,67 @@ export type TrainingSet =
   | {
       title: string
       url: string
+      download_url: string
       n_structures: number
       n_materials?: number
       [k: string]: unknown
     }
+
+export type Label = LabelType & {
+  color_scale?: keyof typeof d3sc // D3-scale-chromatic color scale name
+  property?: string // Actual property name for data access (when different from key)
+}
+
+export const DISCOVERY_SETS = [
+  `full_test_set`,
+  `unique_prototypes`,
+  `most_stable_10k`,
+] as const
+export type DiscoverySet = (typeof DISCOVERY_SETS)[number]
+
+export type SortDir = `asc` | `desc`
+
+export interface DiatomicsCurves {
+  distances: number[]
+  'homo-nuclear': Record<string, { energies: number[]; forces: number[][] }>
+  'hetero-nuclear'?: Record<string, { energies: number[]; forces: number[][] }>
+}
+
+// Links data structure used for model resource links
+export interface LinkData {
+  paper: { url: string; title: string; icon: IconName }
+  repo: { url: string; title: string; icon: IconName }
+  pr_url: { url: string; title: string; icon: IconName }
+  checkpoint?: { url: string | null; title: string; icon: IconName; is_missing?: boolean }
+  pred_files: { files: { name: string; url: string }[]; name: string }
+}
+
+export type CellVal =
+  | string
+  | number
+  | boolean
+  | undefined
+  | null
+  | Record<string, unknown>
+  | LinkData
+  | Record<string, string | number | LinkData | null | undefined | boolean>[]
+export interface RowData {
+  style?: string
+  [key: string]: CellVal
+}
+export interface CellSnippetArgs {
+  row: RowData
+  col: Label
+  val: CellVal
+}
+
+export interface GitHubActivityData {
+  name: string
+  repo: string
+  stars: number
+  forks: number
+  commits_last_year: number
+  contributors: number
+  model_key?: string // URL slug for model detail page
+  color?: string
+}

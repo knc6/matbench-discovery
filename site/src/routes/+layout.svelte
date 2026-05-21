@@ -1,92 +1,103 @@
 <script lang="ts">
-  import { afterNavigate, goto } from '$app/navigation'
-  import { page } from '$app/stores'
-  import { Footer, Nav } from '$lib'
-  import { repository } from '$site/package.json'
-  import { CmdPalette } from 'svelte-multiselect'
-  import Toc from 'svelte-toc'
-  import { CopyButton, GitHubCorner, PrevNext } from 'svelte-zoo'
-  import '../app.css'
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
+  import { Footer } from '$lib';
+  import { MODELS } from '$lib/models.svelte';
+  import pkg from '$site/package.json';
+  import type { Snippet } from 'svelte';
+  import { CmdPalette, CopyButton, GitHubCorner, Nav, ThemeToggle } from 'svelte-multiselect';
+  import { heading_anchors } from 'svelte-multiselect/heading-anchors';
+  import Toc from 'svelte-toc';
+  import '../app.css';
+
+  let { children }: { children?: Snippet } = $props()
+  let toc_desktop = $state(true)
 
   const routes = Object.keys(import.meta.glob(`./*/+page.{svelte,md}`)).map(
     (filename) => `/` + filename.split(`/`)[1],
   )
 
-  $: url = $page.url.pathname
-  $: headingSelector = `main :is(${
-    { '/api': `h1, ` }[url] ?? ``
-  }h2, h3, h4):not(.toc-exclude)`
+  let url = $derived(page.url.pathname)
+  let headingSelector = $derived(
+    `main :is(${url === `/api` ? `h1, ` : ``}h2, h3, h4):not(.toc-exclude)`,
+  )
 
-  $: description = {
-    '/': `Benchmarking machine learning energy models for materials discovery.`,
-    '/data': `Details about provenance, chemistry and energies in the benchmark's train and test set.`,
+  const base_description =
+    `Matbench Discovery - Benchmarking machine learning energy models for materials discovery.`
+  const descriptions: Record<string, string> = {
+    '/': base_description,
+    '/data':
+      `Details about provenance, chemistry and energies in the benchmark's train and test set.`,
     '/data/tmi': `Too much information on the benchmark's data.`,
     '/api': `API docs for the Matbench Discovery PyPI package.`,
     '/contribute': `Steps for contributing a new model to the benchmark.`,
     '/models': `Details on each model sortable by metrics.`,
-    '/preprint': `The preprint released with the Matbench Discovery benchmark.`,
-    '/preprint/iclr-ml4mat': `Extended abstract submitted to the ICLR ML4Materials workshop.`,
-  }[url ?? ``]
-  if (url && !description) console.warn(`No description for url=${url}`)
-  $: title = url == `/` ? `` : `${url} • `
+    '/tasks/diatomics': `Metrics and analysis of predicting diatomic energies.`,
+    '/tasks/phonons':
+      `Metrics and analysis of predicting phonon modes and frequencies.`,
+    '/tasks/geo-opt': `Metrics and analysis of predicting ground state geometries.`,
+  }
+  let description = $derived(
+    descriptions[url ?? ``] ?? base_description,
+  )
+  let title = $derived(url === `/` ? `` : `${url} • `)
 
-  const actions = Object.keys(import.meta.glob(`./**/+page.{svelte,md}`)).map(
-    (filename) => {
-      const parts = filename.split(`/`).filter((part) => !part.startsWith(`(`)) // remove hidden route segments
+  const actions = Object.keys(import.meta.glob(`./**/+page.{svelte,md}`))
+    .filter((filename) => !filename.includes(`[`))
+    .map((filename) => {
+      const parts = filename.split(`/`).filter((part) => !part.startsWith(`(`)) // Remove hidden route segments
       const route = `/${parts.slice(1, -1).join(`/`)}`
 
       return { label: route, action: () => goto(route) }
-    },
-  )
-  afterNavigate(({ to }) => {
-    if (to?.route.id == `/models`) {
-      document.documentElement.style.setProperty(`--main-max-width`, `90em`)
-    } else {
-      document.documentElement.style.setProperty(`--main-max-width`, `50em`)
-    }
-
-    for (const node of document.querySelectorAll(`pre > code`)) {
-      // skip if <pre> already contains a button (presumably for copy)
-      const pre = node.parentElement
-      if (!pre || pre.querySelector(`button`)) continue
-
-      new CopyButton({
-        target: pre,
-        props: {
-          content: node.textContent ?? ``,
-          style: `position: absolute; top: 1ex; right: 1ex;`,
-        },
-      })
-    }
-  })
+    })
+    .concat(
+      MODELS.map((model) => ({
+        label: `/models/${model.model_key}`,
+        action: () => goto(`/models/${model.model_key}`),
+      }))
+    )
 </script>
 
 <CmdPalette {actions} placeholder="Go to..." />
+<CopyButton global />
 
 <svelte:head>
   <title>{title}Matbench Discovery</title>
   <meta name="description" content={description} />
 </svelte:head>
 
-{#if url !== `/models`}
-  <Toc {headingSelector} breakpoint={1250} minItems={3} />
+{#if ![`/`, `/models`, `/tasks/geo-opt`].includes(url)}
+  <Toc
+    {headingSelector}
+    breakpoint={1350}
+    minItems={3}
+    bind:desktop={toc_desktop}
+    asideStyle={toc_desktop ? `max-width: 22em; position: fixed; left: calc(50vw + var(--main-max-width) / 2); top: 2em;` : `z-index: 10;`}
+    navStyle={toc_desktop ? `font-size: 7pt;` : `font-size: 7pt; z-index: 10; background: var(--page-bg);`}
+    --toc-active-color="var(--link-color)"
+    --toc-padding="1em 1em 0 1.5em"
+    --toc-mobile-width="min(80vw, 30em)"
+    --toc-mobile-border="1px solid var(--border)"
+    --toc-mobile-shadow="0 0 20px var(--shadow)"
+  />
 {/if}
 
-<GitHubCorner href={repository} />
+<GitHubCorner href={pkg.repository} />
 
-<main>
-  <Nav routes={[[`/home`, `/`], ...routes.filter((route) => route != `/changelog`)]} />
+<Nav
+  routes={[`/`, ...routes.filter((route) => route != `/changelog`), [pkg.paper, `Paper`]]}
+  style="margin-block: 1em 0"
+  menu_props={{ style: `gap: 1.5em` }}
+  labels={{ '/': `Home`, '/api': `API` }}
+  link_props={{
+    style: `padding: 0 3pt`,
+  }}
+>
+  <ThemeToggle />
+</Nav>
 
-  <slot />
-
-  <PrevNext
-    items={[`/`, ...routes]}
-    current="/{url?.split(`/`)[1]}"
-    style="margin: 4em auto 1em; max-width: 60em;"
-  >
-    <a slot="next" let:item={href} {href} class="link">{href} &rarr;</a>
-    <a slot="prev" let:item={href} {href} class="link">&larr; {href}</a>
-  </PrevNext>
+<main {@attach heading_anchors()}>
+  {@render children?.()}
 </main>
 
 <Footer />

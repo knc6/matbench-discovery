@@ -9,7 +9,6 @@ import os
 import pickle
 
 import pandas as pd
-import pymatviz
 import pymatviz as pmv
 from pymatgen.analysis.phase_diagram import PatchedPhaseDiagram
 from pymatgen.entries.compatibility import MaterialsProject2020Compatibility
@@ -19,8 +18,8 @@ from pymatviz.enums import Key
 from tqdm import tqdm
 
 from matbench_discovery import MP_DIR, ROOT, today
-from matbench_discovery.data import DataFiles
 from matbench_discovery.energy import get_e_form_per_atom, get_elemental_ref_entries
+from matbench_discovery.enums import DataFiles
 
 module_dir = os.path.dirname(__file__)
 
@@ -30,12 +29,17 @@ all_mp_computed_structure_entries = MPRester().get_entries("")
 
 # save all ComputedStructureEntries to disk
 # mp-15590 appears twice so we drop_duplicates()
-df_mp_cse = pd.DataFrame(all_mp_computed_structure_entries, columns=["entry"])
+df_mp_cse = pd.DataFrame(
+    all_mp_computed_structure_entries,
+    columns=["entry"],
+)
 df_mp_cse.index.name = Key.mat_id
 df_mp_cse.index = [e.entry_id for e in df_mp_cse.entry]
 df_mp_cse.reset_index().to_json(
-    f"{module_dir}/{today}-mp-computed-structure-entries.json.gz",
+    f"{module_dir}/{today}-mp-computed-structure-entries.jsonl.gz",
     default_handler=lambda x: x.as_dict(),
+    orient="records",
+    lines=True,
 )
 
 
@@ -74,24 +78,22 @@ with gzip.open(f"{module_dir}/{today}-ppd-mp.pkl.gz", mode="wb") as zip_file:
 
 
 # %% build phase diagram with both MP entries + WBM entries
-df_wbm = pd.read_json(DataFiles.wbm_computed_structure_entries.path).set_index(
-    Key.mat_id
-)
+wbm_cse_path = DataFiles.wbm_computed_structure_entries.path
+df_wbm = pd.read_json(wbm_cse_path, lines=True).set_index(Key.mat_id)
 
 # using ComputedStructureEntry vs ComputedEntry here is important as CSEs receive
 # more accurate energy corrections that take into account peroxide/superoxide nature
 # of materials (and same for sulfides) based on atomic distances in the structure
-wbm_computed_entries: list[ComputedStructureEntry] = df_wbm.query(
-    "n_elements > 1"
-).cse.map(ComputedStructureEntry.from_dict)
-
+filtered_entries = list(
+    df_wbm.query("n_elements > 1").cse.map(ComputedStructureEntry.from_dict)
+)
 wbm_computed_entries = MaterialsProject2020Compatibility().process_entries(
-    wbm_computed_entries, verbose=True, clean=True
+    filtered_entries, verbose=True, clean=True
 )
 
-n_skipped = len(df_wbm) - len(wbm_computed_entries)
-assert n_skipped == 0
-print(f"{n_skipped:,} ({n_skipped / len(df_wbm):.1%}) entries not processed")
+n_skipped = len(filtered_entries) - len(wbm_computed_entries)
+assert n_skipped == 0, f"process_entries() unexpectedly filtered {n_skipped} entries"
+print(f"{n_skipped:,} ({n_skipped / len(filtered_entries):.1%}) entries not processed")
 
 
 # %% merge MP and WBM entries into a single PatchedPhaseDiagram
@@ -125,10 +127,8 @@ df_mp[e_form_us] = [
 
 
 # make sure get_form_energy_per_atom() reproduces MP formation energies
-ax = pymatviz.density_scatter(df_mp[Key.form_energy], df_mp[e_form_us])
-ax.set(
-    title="MP Formation Energy Comparison",
-    xlabel="MP Formation Energy (eV/atom)",
-    ylabel="Our Formation Energy (eV/atom)",
-)
-pmv.save_fig(ax, f"{ROOT}/tmp/{today}-our-vs-mp-formation-energies.webp", dpi=300)
+fig = pmv.density_scatter(df=df_mp, x=Key.form_energy, y=e_form_us)
+fig.layout.title = "Formation Energy Comparison"
+fig.layout.xaxis.title = "MP Formation Energy (eV/atom)"
+fig.layout.yaxis.title = "Our Formation Energy (eV/atom)"
+pmv.save_fig(fig, f"{ROOT}/tmp/{today}-our-vs-mp-formation-energies.webp", dpi=300)

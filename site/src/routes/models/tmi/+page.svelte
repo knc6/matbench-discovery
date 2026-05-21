@@ -1,35 +1,36 @@
 <script lang="ts">
-  import { browser } from '$app/environment'
-  import EachErrorVsLeastPrevalentElementInStruct from '$figs/each-error-vs-least-prevalent-element-in-struct.svelte'
-  import ElementPrevalenceVsErr from '$figs/element-prevalence-vs-error.svelte'
-  import HistLargestEachErrorsFpDiffModels from '$figs/hist-largest-each-errors-fp-diff-models.svelte'
-  import ScatterLargestEachErrorsFpDiffModels from '$figs/scatter-largest-each-errors-fp-diff-models.svelte'
-  import ScatterLargeFpDiffVsEachError from '$figs/scatter-largest-fp-diff-each-error-models.svelte'
+  import EachErrorVsLeastPrevalentElementInStruct from '$figs/tmi/each-error-vs-least-prevalent-element-in-struct.svelte'
+  import ElementPrevalenceVsErr from '$figs/tmi/element-prevalence-vs-error.svelte'
+  import HistLargestEachErrorsFpDiffModels from '$figs/tmi/hist-largest-each-errors-fp-diff-models.svelte'
+  import ScatterLargestEachErrorsFpDiffModels from '$figs/tmi/scatter-largest-each-errors-fp-diff-models.svelte'
+  import ScatterLargeFpDiffVsEachError from '$figs/tmi/scatter-largest-fp-diff-each-error-models.svelte'
   import ElementErrorsPtableHeatmap from './ElementErrorsPtableHeatmap.svelte'
+  import DiscoveryMetricFigs from './discovery-metric-figs.md'
 </script>
 
 <h1>Too Much Information</h1>
 
 Stuff that didn't make the cut into the&nbsp;<a href="/models">model page</a>.
 
-<h2 style="margin: 4em auto 1em; text-align: center;">
-  Per-Element Model Error Heatmaps
-</h2>
+<h2>Per-Element Model Error Heatmaps</h2>
 
 <ElementErrorsPtableHeatmap />
 
+<br />
+
+<DiscoveryMetricFigs />
+
 <h2>Does error correlate with element prevalence in training set?</h2>
 
-Answer: not much. You might (or might not) expect the more examples of structures
-containing a certain element models have seen in the training set, the smaller their
-average error on test set structures containing that element. That's not what we see in
-this plot. E<sub>above hull</sub> is all over the place as a function of elemental
-training set prevalence. Could be because the error is dominated by the least abundant
-element in composition or the model errors are more dependent on geometry than chemistry.
+Answer: not much. You might expect the more examples of structures containing a certain
+element models have seen in the training set, the smaller their average error on test set
+structures containing that element. That's not what we see in this plot. E<sub>above
+  hull</sub>
+is all over the place as a function of elemental training set prevalence. Could be because
+the error is dominated by the least abundant element in composition or the model errors
+are more dependent on geometry than chemistry.
 
-{#if browser}
-  <ElementPrevalenceVsErr style="margin: 2em 0;" />
-{/if}
+<ElementPrevalenceVsErr style="margin: 2em 0" />
 
 <h2>Does error correlate with relaxation change?</h2>
 
@@ -40,31 +41,25 @@ relaxation as measured by<code>matminer</code>'s
 >
   <code>SiteStatsFingerprint</code>
 </a>
-(which is volume independent so changes in fingerprint require ion migration or similar) and
-plotting against that the absolute E<sub>above hull</sub> errors for each model.
+(which is volume independent so changes in fingerprint require ion migration or similar)
+and plotting against that the absolute E<sub>above hull</sub> errors for each model.
 
-{#if browser}
-  <ScatterLargeFpDiffVsEachError style="margin: 2em 0;" />
-{/if}
+<ScatterLargeFpDiffVsEachError style="margin: 2em 0" />
 
 Same plot except taking the structures with largest difference in atomic environments
 (again measured by
 <code>SiteStatsFingerprint</code> before vs after relaxation) and plotting all model
 errors.
 
-{#if browser}
-  <ScatterLargestEachErrorsFpDiffModels style="margin: 2em 0;" />
-{/if}
+<ScatterLargestEachErrorsFpDiffModels style="margin: 2em 0" />
 
 Another way to plot this is as a histogram. This shows the difference in
 SiteStatsFingerprint before vs after relaxation for structures with the largest (err<sub
-  >max</sub
->) and smallest (err<sub>min</sub>) absolute error in predicted E<sub>above hull</sub>
+>max</sub>) and smallest (err<sub>min</sub>) absolute error in predicted E<sub>above
+  hull</sub>
 for each model and the mean of all models.
 
-{#if browser}
-  <HistLargestEachErrorsFpDiffModels style="margin: 2em 0;" />
-{/if}
+<HistLargestEachErrorsFpDiffModels style="margin: 2em 0" />
 
 <h2>
   Does model error correlate with structure's least prevalent element in training set?
@@ -74,6 +69,4 @@ Answer: a little. The fact that structures containing only elements with high pr
 in the training set consistently see low errors across all models suggests that to get a
 universally robust model, it needs to be trained on lots of examples for every element.
 
-{#if browser}
-  <EachErrorVsLeastPrevalentElementInStruct style="margin: 2em 0;" />
-{/if}
+<EachErrorVsLeastPrevalentElementInStruct style="margin: 2em 0" />

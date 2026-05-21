@@ -1,0 +1,702 @@
+WBM:
+  name: WBM Benchmark Test Set
+  url: https://github.com/janosh/matbench-discovery/blob/main/data/wbm/readme.md
+  doi: https://doi.org/10.1038/s41524-020-00481-6
+  n_structures: 256_963 # 257_487 before filtering suspicious data, see data/wbm/compile_wbm_test_set.py
+  n_materials: 215_488 # based on number of unique Aflow-style structure prototypes
+  n_stable_materials: 42_825
+  n_uniq_stable_materials: 32_942
+  open: true
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2021-01-01
+  license: CC-BY-4.0
+  description: |
+    Benchmark test set for Matbench Discovery containing 256,963 structures generated via chemical
+    similarity-based elemental substitution of MP source structures followed by DFT relaxation and
+    calculating each structure's formation energy. This is the primary test set used to evaluate
+    model performance on materials discovery tasks.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Hai-Chen Wang
+      affiliation: Martin-Luther-Universität Halle-Wittenberg, Germany
+    - name: Silvana Botti
+      affiliation: Friedrich-Schiller-Universität Jena, Germany
+      email: silvana.botti@uni-jena.de
+      url: https://wikipedia.org/wiki/Silvana_Botti
+    - name: Miguel A. L. Marques
+      affiliation: Martin-Luther-Universität Halle-Wittenberg, Germany
+      orcid: https://orcid.org/0000-0003-0170-8222
+
+MP 2022:
+  name: MP v2022.10.28
+  url: https://docs.materialsproject.org/changes/database-versions#v2022.10.28
+  download_url: https://figshare.com/files/40344436
+  n_structures: 154_719
+  open: true
+  static: true
+  compliant: true
+  optimade_api: null
+  native_api: null
+  date_created: 2022-10-28
+  license: CC-BY-4.0
+  doi: https://doi.org/10.1063/1.4812323
+  description: Entire Materials Project dataset from October 2022.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Materials Project Team
+      url: https://materialsproject.org/about/people
+
+MPtrj:
+  name: MPtrj
+  url: https://figshare.com/articles/dataset/23713842
+  download_url: https://figshare.com/files/41619375
+  doi: https://doi.org/10.1038/s42256-023-00716-3
+  n_structures: 1_580_395
+  n_materials: 145_923
+  open: true
+  static: true
+  compliant: true
+  optimade_api: null
+  native_api: null
+  date_created: 2023-07-19
+  license: MIT
+  description: Materials Project DFT relaxation trajectories cleaned of unrealistic energies and forces, and filtered for less redundancy using pymatgen's StructureMatcher to contain only about every 10th ionic step (1.5M structures). Originally created for training CHGNet.
+  notes:
+    Leakage: |
+      MPtrj contains structure prototypes that overlap with the WBM benchmark test set.
+      For this reason, the leaderboard by default shows discovery metrics on the ~215k / 257k WBM subset of unique prototypes that have no overlap with MPtrj.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Materials Project Team
+      url: https://materialsproject.org/about/people
+    - name: Bowen Deng
+      affiliation: UC Berkeley
+      orcid: https://orcid.org/0000-0002-5720-5299
+
+MPF:
+  name: MPF.2021.2.8
+  url: https://figshare.com/articles/dataset/19470599
+  download_url: https://figshare.com/ndownloader/articles/19470599/versions/3
+  doi: https://doi.org/10.1038/s43588-022-00349-3
+  n_structures: 188_349
+  n_materials: 62_783
+  open: true
+  static: true
+  compliant: true
+  optimade_api: null
+  native_api: null
+  date_created: 2022-03-05
+  license: CC-BY-4.0
+  description: Materials Project Force dataset used to train the M3GNet model reported in https://arxiv.org/abs/2202.02450.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Materials Project Team
+      url: https://materialsproject.org/about/people
+    - name: Chi Chen
+      affiliation: UC San Diego
+      orcid: https://orcid.org/0000-0001-8008-7043
+      github: https://github.com/chc273
+
+MP Graphs:
+  name: Graphs of MP 2019
+  url: https://figshare.com/articles/dataset/8097992
+  download_url: https://figshare.com/ndownloader/articles/8097992/versions/2
+  doi: https://doi.org/10.1021/acs.chemmater.9b01294
+  n_structures: 133_420
+  open: true
+  static: true
+  compliant: true
+  optimade_api: null
+  native_api: null
+  date_created: 2019-06-06
+  license: MIT
+  description: Contains 133,420 graph-target pairs for Materials Project structures which were used to train the MEGNet formation energy model.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Materials Project Team
+      url: https://materialsproject.org/about/people
+    - name: Chi Chen
+      affiliation: UC San Diego
+      orcid: https://orcid.org/0000-0001-8008-7043
+      github: https://github.com/chc273
+
+GNoME:
+  name: GNoME
+  url: https://github.com/google-deepmind/materials_discovery
+  doi: https://doi.org/10.1038/s41586-023-06735-9
+  n_structures: 89_000_000
+  n_materials: 6_000_000
+  open: false
+  static: true
+  optimade_api: https://optimade-gnome.odbx.science
+  native_api: null
+  date_created: 2023-11-29 # https://github.com/google-deepmind/materials_discovery/commit/a701b9529
+  license: CC-BY-NC-4.0
+  description: Google DeepMind's Graph Networks for Materials Exploration dataset containing millions of crystal structures generated with symmetry aware partial substitutions (SAPS) and their DFT-calculated energies, forces and stresses. Aimed at large-scale materials discovery.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Amil Merchant
+      affiliation: Google DeepMind
+      email: amilmerchant@google.com
+      orcid: https://orcid.org/0000-0001-5262-6599
+    - name: Simon Batzner
+      affiliation: Google DeepMind
+    - name: Samuel S. Schoenholz
+      affiliation: Google DeepMind
+    - name: Muratahan Aykol
+      affiliation: Google DeepMind
+    - name: Gowoon Cheon
+      affiliation: Google DeepMind
+    - name: Ekin Dogus Cubuk
+      affiliation: Google DeepMind
+      email: cubuk@google.com
+      orcid: https://orcid.org/0000-0003-0524-2837
+
+MatterSim:
+  name: MatterSim
+  url: https://github.com/microsoft/mattersim # https://microsoft.github.io/mattersim
+  doi: https://doi.org/10.48550/arXiv.2405.04967
+  n_structures: 17_000_000
+  temperature_range: 0-5000 K
+  pressure_range: 0-1000 GPa
+  open: false
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2024-05-08
+  license: unreleased
+  description: Large-scale materials simulation dataset from Microsoft Research containing DFT-calculated properties across a wide range of temperatures and pressures. Aimed at training robust universal interatomic potentials that remain accurate even far from equilibrium.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Microsoft Research AI for Science Team
+      url: https://microsoft.com/research/lab/microsoft-research-ai-for-science/people
+
+Alex:
+  name: Alexandria
+  url: https://alexandria.icams.rub.de
+  download_url: https://alexandria.icams.rub.de/data/pbe # too large for single download, split into subfiles
+  doi: https://doi.org/10.1002/adma.202210788
+  n_structures: 30_497_628
+  n_materials: 3_100_000
+  open: true
+  static: true
+  optimade_api: https://optimade.org/providers-dashboard/providers/alexandria
+  native_api: null
+  date_created: 2023-04-22
+  license: CC-BY-4.0
+  description: Large collection of DFT structure relaxation trajectories with energies, forces, stresses for ~3M materials. Aimed at training ML potentials for materials discovery.
+  notes:
+    Leakage: |
+      Alexandria contains structure prototypes that overlap with the WBM benchmark test set (~97k overlapping prototypes).
+      Models trained on this dataset benefit from some amount of train/test leakage, though testing on Orb v2 showed that brief (less than 1 epoch)
+      fine-tuning resulted in identical metrics whether fine-tuning on Alexandria or sAlex. Still, we recommend using the filtered sAlex dataset for benchmarking.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE
+    pseudopotentials: PBE
+  created_by:
+    - name: Jonathan Schmidt
+      orcid: https://orcid.org/0000-0001-5685-6404
+      affiliation: Martin-Luther-Universität Halle-Wittenberg, Germany
+    - name: Noah Hoffmann
+    - name: Hai-Chen Wang
+      orcid: https://orcid.org/0000-0002-2892-5879
+      affiliation: Martin-Luther-Universität Halle-Wittenberg, Germany
+    - name: Pedro Borlido
+    - name: Pedro J. M. A. Carriço
+    - name: Tiago F. T. Cerqueira
+    - name: Silvana Botti
+      email: silvana.botti@uni-jena.de
+      url: https://wikipedia.org/wiki/Silvana_Botti
+      affiliation: Friedrich-Schiller-Universität Jena, Germany
+    - name: Miguel A. L. Marques
+      affiliation: Martin-Luther-Universität Halle-Wittenberg, Germany
+      orcid: https://orcid.org/0000-0003-0170-8222
+
+OMat24:
+  name: OMat24
+  url: https://huggingface.co/datasets/fairchem/OMAT24#omat24-dataset
+  doi: https://doi.org/10.48550/arXiv.2410.12771
+  # this is the number of Alexandria materials that was sampled from, but according to Luis unclear
+  # if all were indeed picked so this is an upper bound on the number of materials
+  n_materials: 3_227_606
+  n_structures: 100_824_585
+  open: true
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2024-10-16
+  license: CC-BY-4.0
+  description: Open Materials 2024 dataset from Meta's FAIRchem containing over 100M structures derived from applying perturbations to Alexandria structures. Aimed at training foundation models for materials science.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE_54
+  created_by:
+    - name: Luis Barroso-Luque
+      affiliation: FAIR at Meta
+      email: lbluque@meta.com
+      orcid: https://orcid.org/0000-0002-6453-9545
+      github: https://github.com/lbluque
+      corresponding: true
+    - name: Muhammed Shuaibi
+      affiliation: FAIR at Meta
+    - name: Xiang Fu
+      affiliation: FAIR at Meta
+    - name: Brandon M. Wood
+      affiliation: FAIR at Meta
+    - name: Misko Dzamba
+      affiliation: FAIR at Meta
+    - name: Meng Gao
+      affiliation: FAIR at Meta
+    - name: Ammar Rizvi
+      affiliation: FAIR at Meta
+    - name: C. Lawrence Zitnick
+      affiliation: FAIR at Meta
+    - name: Zachary W. Ulissi
+      affiliation: FAIR at Meta
+      email: zulissi@meta.com
+      orcid: https://orcid.org/0000-0002-9401-4918
+      corresponding: true
+
+sAlex:
+  name: Subsampled Alexandria
+  contains: [Alex]
+  url: https://huggingface.co/datasets/fairchem/OMAT24#salex-dataset
+  download_url: https://dl.fbaipublicfiles.com/opencatalystproject/data/omat/241018/sAlex/train.tar.gz
+  doi: https://doi.org/10.48550/arXiv.2410.12771
+  n_materials: 3_227_606
+  n_structures: 10_447_765
+  open: true
+  static: true
+  optimade_api: https://optimade.org/providers-dashboard/providers/alexandria
+  native_api: null
+  date_created: 2024-10-16
+  license: CC-BY-4.0
+  description: Subsampled version of the Alexandria dataset, containing approximately 10 million structures filtered to remove structure prototype overlap with Matbench Discovery's WBM test set. See [`matbench_discovery.structure.prototype.get_protostructure_label`](https://github.com/janosh/matbench-discovery/blob/5f02f790e1/matbench_discovery/structure/prototype.py#L104-L193).
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Luis Barroso-Luque
+      affiliation: FAIR at Meta
+      email: lbluque@meta.com
+      orcid: https://orcid.org/0000-0002-6453-9545
+      github: https://github.com/lbluque
+
+sAlex Validation:
+  name: Subsampled Alexandria Validation Set
+  contains: [Alex]
+  url: https://huggingface.co/datasets/fairchem/OMAT24#salex-dataset
+  download_url: https://dl.fbaipublicfiles.com/opencatalystproject/data/omat/241018/sAlex/val.tar.gz
+  doi: https://doi.org/10.48550/arXiv.2410.12771
+  n_materials: 170_905 # approximate value! TODO confirm this
+  n_structures: 553_218
+  open: true
+  static: true
+  optimade_api: https://optimade.org/providers-dashboard/providers/alexandria
+  native_api: null
+  date_created: 2024-10-16
+  license: CC-BY-4.0
+  description: Validation subset of the subsampled Alexandria dataset, containing ~500k structures for evaluating model performance during training. Filtered to remove structure prototype overlap with WBM.
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Luis Barroso-Luque
+      affiliation: FAIR at Meta
+      email: lbluque@meta.com
+      orcid: https://orcid.org/0000-0002-6453-9545
+      github: https://github.com/lbluque
+
+OpenLAM:
+  name: OpenLAM dataset v1
+  # strictly speaking contains Alex2D, not the Alex in this file which refers to Alex3D
+  contains: [OMat24, MPtrj, Alex]
+  url: https://aissquare.com/datasets/detail?pageType=datasets&name=LAMBench-TrainingSet-v1&id=308
+  download_url: https://aissquare.com/datasets/detail?pageType=datasets&name=LAMBench-TrainingSet-v1&id=308 # will be combined for downloading soon
+  doi: https://doi.org/10.48550/arXiv.2501.16358
+  n_structures: 162_507_178
+  open: true
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2025-02-17
+  license: CC-BY-4.0
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: [PBE, PBE_54]
+  created_by:
+    - name: AISI
+      email: pengay@aisi.ac.cn
+      affiliation: AI for Science Institute, Beijing, China
+    - name: Xinzijian Liu
+      affiliation: AI for Science Institute, Beijing, China
+    - name: Ming-Yu Guo
+      affiliation: DP Technology, Beijing, China
+    - name: Linfeng Zhang
+      affiliation: AI for Science Institute, Beijing, China
+    - name: Han Wang
+      affiliation: HEDPS, CAPT, College of Engineering, Peking University, Beijing, China
+  description: |
+    This dataset integrates multidisciplinary DFT data sourced from Deep Modeling community (https://github.com/deepmodeling)
+    and other open repositories to pre-train large atomic models (LAMs),
+    while intentionally excluding overlap with WBM benchmark systems (e.g., Alex3D structures).
+
+COSMOSDataset:
+  name: COSMOSDataset
+  contains: [MPtrj, OMat24, sAlex, OC20, MatPES PBE, MatPES r2SCAN]
+  url: https://figshare.com/articles/software/SevenNet-Omni_checkpoint/30399814
+  download_url: https://figshare.com/articles/software/SevenNet-Omni_checkpoint/30399814
+  doi: https://doi.org/10.48550/arXiv.2510.11241
+  n_structures: 242_788_218
+  open: true
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2025-10-21
+  license: CC-BY-4.0
+  method: DFT
+  params:
+    code: Various
+    functional: Various
+    pseudopotentials: Various
+  created_by:
+    - name: Jaesun Kim
+      affiliation: Seoul National University
+      orcid: https://orcid.org/0009-0000-6646-1318
+    - name: Jinmu You
+      affiliation: Seoul National University
+      orcid: https://orcid.org/0009-0003-7152-7774
+    - name: Seungwu Han
+      affiliation: Seoul National University, Korea Institute for Advanced Study
+      email: hansw@snu.ac.kr
+      orcid: https://orcid.org/0000-0003-3958-0922
+  description: |
+    COSMOS Dataset (Combined Organic, Surface and Materials Open Source Dataset) aggregates 15 publicly available ab initio databases spanning molecules, inorganic crystals, metal and oxide surfaces, and metal-organic frameworks, covering levels of theory from generalized gradient approximation to hybrid functionals. It also includes a domain-bridging set, sampled from OC20, OC22, MatPES, ODAC23, OMol25, and QCML dataset and recomputed with MPtrj-consistent computational settings, which facilitates cross-domain knowledge transfer in a multi-task training framework. For detailed information about the dataset composition, see Table 1 from [the paper](https://arxiv.org/abs/2510.11241).
+
+OC20:
+  name: Open Catalyst 2020
+  url: https://opencatalystproject.org/leaderboard.html
+  download_url: https://fair-chem.github.io/catalysts/datasets/oc20.html#per-adsorbate-trajectories-optional-download
+  doi: https://doi.org/10.1021/acscatal.0c04525
+  n_structures: 133_934_018
+  open: true
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2020-10-01
+  license: CC-BY-4.0
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Open Catalyst Project Team
+      url: https://opencatalystproject.org
+  description: |
+    A dataset for catalysis research containing DFT relaxations of adsorbates on catalyst surfaces,
+    specifically designed for training ML models to predict adsorption energies and atomic forces.
+
+NOMAD:
+  name: NOMAD Repository
+  url: https://nomad-lab.eu/prod/v1/gui/search/calculations
+  doi: https://joss.theoj.org/papers/10.21105/joss.05388
+  n_structures: 19_111_098 # as of 2025-04-04
+  n_materials: 4_335_728
+  open: true
+  static: false
+  contains: [Alex, OQMD]
+  optimade_api: https://optimade.org/providers-dashboard/providers/nmd
+  native_api: https://nomad-lab.eu/prod/v1/gui/analyze/apis
+  date_created: 2019-06-01
+  license: CC-BY-4.0
+  method: [DFT, ML, GW, DMFT, MD]
+  params:
+    code: Various
+    functional: Various
+    pseudopotentials: Various
+  created_by:
+    - name: Markus Scheidgen
+      orcid: https://orcid.org/0000-0002-8038-2277
+    - name: Lauri Himanen
+      orcid: https://orcid.org/0000-0002-3130-8193
+    - name: Alvin Noe Ladines # codespell:ignore
+      orcid: https://orcid.org/0000-0003-0077-2097
+    - name: David Sikter
+      orcid: https://orcid.org/0000-0002-2102-7160
+    - name: Mohammad Nakhaee
+      orcid: https://orcid.org/0000-0003-4146-0129
+    - name: Ádám Fekete
+      orcid: https://orcid.org/0000-0002-6263-897X
+    - name: Theodore Chang
+      orcid: https://orcid.org/0000-0002-4911-0230
+    - name: Amir Golparvar
+      orcid: https://orcid.org/0000-0002-2412-6615
+    - name: José A. Márquez
+      orcid: https://orcid.org/0000-0002-8173-2566
+    - name: Sandor Brockhauser
+      orcid: https://orcid.org/0000-0002-9700-4803
+    - name: Sebastian Brückner
+      orcid: https://orcid.org/0000-0002-5969-847X
+    - name: Luca M. Ghiringhelli
+      orcid: https://orcid.org/0000-0001-5099-3029
+    - name: Felix Dietrich
+      orcid: https://orcid.org/0000-0002-2906-1769
+    - name: Daniel Lehmberg
+      orcid: https://orcid.org/0000-0002-4012-5014
+    - name: Thea Denell
+      orcid: https://orcid.org/0009-0000-7185-9363
+    - name: Andrea Albino
+      orcid: https://orcid.org/0000-0001-9280-7431
+    - name: Hampus Näsström
+      orcid: https://orcid.org/0000-0002-3264-1692
+    - name: Sherjeel Shabih
+      orcid: https://orcid.org/0009-0008-6635-4465
+    - name: Florian Dobener
+      orcid: https://orcid.org/0000-0003-1987-6224
+    - name: Markus Kühbach
+      orcid: https://orcid.org/0000-0002-7117-5196
+    - name: Rubel Mozumder
+      orcid: https://orcid.org/0009-0007-5926-6646
+    - name: Joseph F. Rudzinski
+      orcid: https://orcid.org/0000-0003-3403-640X
+    - name: Nathan Daelman
+      orcid: https://orcid.org/0000-0002-7647-1816
+    - name: José M. Pizarro
+      orcid: https://orcid.org/0000-0002-6751-8192
+    - name: Martin Kuban
+      orcid: https://orcid.org/0000-0002-1619-2460
+    - name: Cuauhtemoc Salazar
+      orcid: https://orcid.org/0000-0002-9635-5062
+    - name: Pavel Ondračka
+      orcid: https://orcid.org/0000-0003-0729-629X
+    - name: Hans-Joachim Bungartz
+      orcid: https://orcid.org/0000-0002-0171-0712
+    - name: Claudia Draxl
+      orcid: https://orcid.org/0000-0003-3523-6657
+  description: |
+    A repository hosting over 19 million calculations across various computational materials science codes,
+    providing a rich source of DFT and molecular dynamics data for training ML models.
+
+AFLOW:
+  name: AFLOW Database
+  url: https://aflow.org
+  doi: https://doi.org/10.1016/j.commatsci.2012.02.005
+  n_structures: 3_530_330 # as of 2025-04-04
+  n_materials: 3_530_330 # unsure how number of materials and structures differ for AFLOW
+  open: true
+  static: false
+  optimade_api: https://optimade.org/providers-dashboard/providers/aflow
+  native_api: https://aflow.org/documentation
+  date_created: 2012-06-01
+  license: CC-BY-4.0
+  method: DFT
+  params:
+    code: VASP
+    functional: Various
+    pseudopotentials: Various
+  created_by:
+    - name: Stefano Curtarolo
+    - name: Wahyu Setyawan
+    - name: Gus L.W. Hart # codespell:ignore
+    - name: Michal Jahnatek
+    - name: Roman V. Chepulskii
+    - name: Richard H. Taylor
+    - name: Shidong Wang
+    - name: Junkai Xue
+    - name: Kesong Yang
+    - name: Ohad Levy
+    - name: Michael J. Mehl
+    - name: Harold T. Stokes
+    - name: Denis O. Demchenko
+    - name: Dane Morgan
+  description: |
+    A database of over 3.5 million materials with calculated thermodynamic, electronic, and structural properties,
+    using standardized high-throughput DFT calculations.
+
+OQMD:
+  name: Open Quantum Materials Database
+  url: https://oqmd.org
+  doi: https://doi.org/10.1007/s11837-013-0755-4
+  download_url: https://static.oqmd.org/static/downloads/qmdb__v1_6__112023.sql.gz
+  n_materials: 1_226_781 # as of 2025-04-04
+  n_structures: 1_226_781
+  open: true
+  static: true # since download link points to the specific version v1.6
+  optimade_api: https://optimade.org/providers-dashboard/providers/oqmd
+  native_api: https://static.oqmd.org/static/docs/restful.html
+  date_created: 2014-04-03
+  license: CC-BY-4.0
+  method: DFT
+  params:
+    code: VASP
+    code_version: 5.3.2 # see settings page https://oqmd.org/documentation/vasp
+    functional: PBE
+    pseudopotentials: PBE
+    energy_cutoff: 520 eV
+    kpoint_density: 8000 KPPRA
+  created_by:
+    - name: James E. Saal
+    - name: Scott Kirklin
+    - name: Muratahan Aykol
+    - name: Bryce Meredig
+    - name: Chris Wolverton
+  description: |
+    A database of DFT-calculated thermodynamic and structural properties for over 1 million inorganic compounds,
+    focused on providing data for materials discovery and design. Calculations use a four-step relaxation scheme
+    with progressively increasing precision, with GGA+U for transition metals, lanthanides, and actinides in
+    compounds with oxygen. Spin-polarization is used for structures containing 3d or actinide elements.
+
+MatPES PBE:
+  name: MatPES v1.0 PBE
+  url: https://matpes.ai
+  download_url: https://s3.us-east-1.amazonaws.com/materialsproject-contribs/MatPES_2025_1/MatPES-PBE-2025.1.json.gz
+  n_structures: 434_712 # as of 2025-04-04
+  open: true
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2025-03-06
+  doi: https://doi.org/10.48550/arXiv.2503.04070
+  license: MIT
+  method: DFT
+  params:
+    code: VASP
+    code_version: 6.4.x
+    functional: PBE
+    pseudopotentials: PBE_64
+  created_by:
+    - name: Aaron D. Kaplan
+    - name: Runze Liu
+    - name: Ji Qi
+    - name: Tsz Wai Ko
+    - name: Bowen Deng
+    - name: Janosh Riebesell
+    - name: Gerbrand Ceder
+    - name: Kristin A. Persson
+    - name: Shyue Ping Ong
+  description: |
+    A dataset containing 434,712 structures from ~300K molecular dynamics simulations,
+    providing potential energy surfaces that are valuable for training ML interatomic potentials.
+
+MatPES r2SCAN:
+  name: MatPES v1.0 r2SCAN
+  url: https://matpes.ai
+  download_url: https://s3.us-east-1.amazonaws.com/materialsproject-contribs/MatPES_2025_1/MatPES-R2SCAN-2025.1.json.gz
+  n_structures: 387_897 # as of 2025-04-04
+  open: true
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2025-03-06
+  doi: https://doi.org/10.48550/arXiv.2503.04070
+  license: MIT
+  method: DFT
+  params:
+    code: VASP
+    code_version: 6.4.x
+    functional: r2SCAN
+    pseudopotentials: PBE_64
+  created_by:
+    - name: Aaron D. Kaplan
+    - name: Runze Liu
+    - name: Ji Qi
+    - name: Tsz Wai Ko
+    - name: Bowen Deng
+    - name: Janosh Riebesell
+    - name: Gerbrand Ceder
+    - name: Kristin A. Persson
+    - name: Shyue Ping Ong
+  description: |
+    A dataset containing 387,897 structures from ~300K molecular dynamics simulations,
+    providing potential energy surfaces that are valuable for training ML interatomic potentials.
+
+MDR Phonon PBE:
+  name: MDR Phonon PBE
+  url: https://alexandria.icams.rub.de/data/phonon_benchmark/pbe
+  download_url: https://alexandria.icams.rub.de/data/phonon_benchmark/
+  doi: https://doi.org/10.48550/arXiv.2412.16551
+  n_structures: 9_959
+  open: true
+  static: true
+  optimade_api: null
+  native_api: null
+  date_created: 2024-12-21
+  license: CC-BY-4.0
+  method: DFT
+  params:
+    code: VASP
+    functional: PBE+U
+    pseudopotentials: PBE
+  created_by:
+    - name: Antoine Loew
+    - name: Dewen Sun
+    - name: Hai-Chen Wang
+    - name: Silvana Botti
+    - name: Miguel A. L. Marques
+  description: |
+    PBE recalculations of the MDR Phonon dataset
+    (https://mdr.nims.go.jp/collections/d7aab932-8512-4b9a-b93d-b61f6e5e7019),
+    introduced in the paper "Universal Machine Learning Interatomic Potentials
+    are Ready for Phonons".
+
+MDR PBE Phonons in MPtrj:
+  name: MDR PBE Phonons in MPtrj
+  contains: [MDR Phonon PBE]
+  url: https://figshare.com/articles/dataset/Preprocessed_data_for_Phonon_Fine-tuning_PFT_/31049869
+  download_url: https://figshare.com/files/60964675
+  doi: https://doi.org/10.48550/arXiv.2601.07742
+  n_structures: 8_510
+  open: true
+  static: true
+  compliant: true
+  date_created: 2026-01-08
+  license: CC-BY-4.0
+  created_by:
+    - name: Teddy Koker
+  description: |
+    Subset of the MDR Phonon PBE dataset to be used for phonon fine-tuning, as
+    introduced in "PFT: Phonon Fine-tuning for Machine Learning Interatomic
+    Potentials". This dataset was constructed by randomly sampling 8,510
+    structures with overlapping mp-id's with MPtrj and preprocessing into
+    .aselmbd files with the Hessian stored in atoms.info["hessian"].

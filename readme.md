@@ -1,7 +1,9 @@
-<h1 align="center" style="line-height: 0; margin: 0 auto 1em;">
-  <img src="https://github.com/janosh/matbench-discovery/raw/main/site/static/favicon.svg" alt="Logo" width="60px"><br>
-  Matbench Discovery
-</h1>
+<slot name="title">
+  <h1 align="center">
+    <img src="https://github.com/janosh/matbench-discovery/raw/main/site/static/favicon.svg" alt="Logo" width="60px"><br>
+    Matbench Discovery
+  </h1>
+</slot>
 
 <h4 align="center" class="toc-exclude" style="display: none;">
 
@@ -13,22 +15,22 @@
 
 </h4>
 
-> Disclaimer: We evaluate how accurately ML models predict solid-state thermodynamic stability. Although this is an important aspect of high-throughput materials discovery, the ranking cannot give a complete picture of a model's general applicability to materials. A high ranking does not constitute endorsement by the Materials Project.
+Matbench Discovery is an [interactive leaderboard](https://janosh.github.io/matbench-discovery/models) which ranks ML models on multiple tasks designed to simulate high-throughput discovery of new stable inorganic crystals, finding their ground state atomic positions and predicting their thermal conductivity.
 
-Matbench Discovery is an [interactive leaderboard](https://janosh.github.io/matbench-discovery/models) and associated [PyPI package](https://pypi.org/project/matbench-discovery) which together make it easy to rank ML energy models on a task designed to simulate high-throughput discovery of new stable inorganic crystals.
+We rank <slot name="model_count">20+</slot> models covering multiple methodologies including graph neural network (GNN) interatomic potentials, GNN one-shot predictors, iterative Bayesian optimizers and random forests with shallow-learning structure fingerprints.
 
-We've tested <slot name="model-count" />models covering multiple methodologies including graph neural network (GNN) interatomic potentials, GNN one-shot predictors, iterative Bayesian optimizers and random forests with shallow-learning structure fingerprints.
-
-<slot name="best-report" />
+<slot name="best_report" />
 
 Our results show that ML models have become robust enough to deploy them as triaging steps to more effectively allocate compute in high-throughput DFT relaxations. This work provides valuable insights for anyone looking to build large-scale materials databases.
 
-<slot name="metrics-table" />
+> 📖 **Important:** In Matbench Discovery, the convex hull used to evaluate stability is constructed from DFT reference energies, not from model predictions. This differs from some other benchmarking approaches and has important implications for metric interpretation. See [`/tasks/discovery`](/tasks/discovery#convex-hull-construction-in-matbench-discovery) for more information.
 
-If you'd like to refer to Matbench Discovery in a publication, please cite the [preprint](https://doi.org/10.48550/arXiv.2308.14920):
+To cite Matbench Discovery, use:
 
-> Janosh Riebesell, Rhys E. A. Goodall, Philipp Benner, Yuan Chiang, Bowen Deng, Alpha A. Lee, Anubhav Jain, and Kristin A. Persson. "Matbench Discovery -- A Framework to Evaluate Machine Learning Crystal Stability Predictions." arXiv, August 28, 2023. https://doi.org/10.48550/arXiv.2308.14920.
+> Riebesell, J., Goodall, R.E.A., Benner, P. et al. A framework to evaluate machine learning crystal stability predictions. Nat Mach Intell 7, 836–847 (2025). https://doi.org/10.1038/s42256-025-01055-1
 
 We welcome new models additions to the leaderboard through GitHub PRs. See the [contributing guide](https://janosh.github.io/matbench-discovery/contribute) for details and ask support questions via [GitHub discussion](https://github.com/janosh/matbench-discovery/discussions).
 
-For detailed results and analysis, check out the [preprint](https://janosh.github.io/matbench-discovery/preprint).
+For detailed results and analysis, check out https://nature.com/articles/s42256-025-01055-1.
+
+> Disclaimer: We evaluate how accurately ML models predict several material properties like thermodynamic stability, thermal conductivity, and atomic positions, in all cases using PBE DFT as reference data. Although these properties are important for high-throughput materials discovery, the ranking cannot give a complete picture of a model's overall ability to drive materials research. A high ranking does not constitute endorsement by the Materials Project.

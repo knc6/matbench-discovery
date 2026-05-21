@@ -6,38 +6,55 @@ model-comparison figure.
 # %%
 import os
 import runpy
+import sys
 from glob import glob
 
-import plotly.graph_objects as go
-from dash import Dash
 from tqdm import tqdm
 
 __author__ = "Janosh Riebesell"
 __date__ = "2023-07-14"
 
-module_dir = os.path.dirname(__file__)
+# Inject --no-show to suppress Plotly figures opening in browser
+if "--no-show" not in sys.argv:
+    sys.argv.append("--no-show")
 
-# monkey patch go.Figure.show() and Dash.run() to prevent them from opening browser
-go.Figure.show = lambda *_args, **_kwargs: None
-Dash.run = lambda *_args, **_kwargs: None
+# Import cli after modifying sys.argv to apply the monkey-patch
+from matbench_discovery.cli import cli_args  # noqa: F401
+
+module_dir = os.path.dirname(__file__)
 
 # subtract __file__ to prevent this file from calling itself
 scripts = set(glob(f"{module_dir}/*.py")) - {__file__}
+scripts -= set(glob(f"{module_dir}/single_model_*.py"))  # ignore single-model scripts
 
 
 # %%
-for file in (pbar := tqdm(scripts)):
-    pbar.set_description(file)
-    try:
-        if file.endswith("parity_energy_models.py"):
-            for which_energy in ("each", "e-form"):
-                runpy.run_path(file, init_globals={"which_energy": which_energy})
-        elif file.endswith("cumulative_metrics.py"):
-            for metrics in (("MAE",), ("Precision", "Recall")):
-                runpy.run_path(file, init_globals={"metrics": metrics})
-        elif file.endswith("rolling_mae_vs_hull_dist_wbm_batches.py"):
-            runpy.run_path(file, init_globals={"models": ("CHGNet", "MACE")})
-        else:
-            runpy.run_path(file)
-    except Exception as exc:
-        print(f"{file!r} failed: {exc}")
+exceptions: dict[str, Exception] = {}  # Collect exceptions here
+
+for show_non_compliant in (False, True):
+    for script_path in (pbar := tqdm(scripts)):
+        pbar.set_postfix_str(script_path)
+        init_globals = {"show_non_compliant": show_non_compliant}
+        try:
+            if script_path.endswith("tiles_energy_parity.py"):
+                for which_energy in ("e-form", "each"):
+                    runpy.run_path(
+                        script_path,
+                        init_globals=init_globals | {"which_energy": which_energy},
+                    )
+            elif script_path.endswith("cumulative_metrics.py"):
+                for metrics in (("MAE",), ("Precision", "Recall")):
+                    runpy.run_path(
+                        script_path, init_globals=init_globals | {"metrics": metrics}
+                    )
+            else:
+                runpy.run_path(script_path, init_globals=init_globals)
+        except Exception as exc:
+            exceptions[script_path] = exc
+
+# Raise a combined exception if any errors were collected
+if exceptions:
+    error_messages = "\n".join(
+        f"{file!r} failed: {exc!r}" for file, exc in exceptions.items()
+    )
+    raise RuntimeError(f"The following errors occurred:\n{error_messages}")

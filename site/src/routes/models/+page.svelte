@@ -1,168 +1,175 @@
 <script lang="ts">
-  import type { ModelStatLabel, ModelStats } from '$lib'
-  import { model_is_compliant, MODEL_METADATA, ModelCard } from '$lib'
-  import { lower_is_better } from '$root/scripts/metrics-which-is-better.yml'
-  import Icon from '@iconify/svelte'
-  import { interpolateCividis as cividis } from 'd3-scale-chromatic'
-  import { ColorBar } from 'elementari'
-  import { RadioButtons, Toggle, Tooltip } from 'svelte-zoo'
+  import { type Label, ModelCard } from '$lib'
+  import { ALL_METRICS, METADATA_COLS } from '$lib/labels'
+  import { get_nested_value, metric_better_as, sort_models } from '$lib/metrics'
+  import { model_is_compliant, MODELS } from '$lib/models.svelte'
+  import { interpolateRdBu } from 'd3-scale-chromatic'
+  import { ColorBar, Icon, luminance } from 'matterviz'
+  import { untrack } from 'svelte'
+  import { tooltip } from 'svelte-multiselect/attachments'
   import { flip } from 'svelte/animate'
   import { fade } from 'svelte/transition'
-  import type { Snapshot } from './$types'
 
-  let sort_by: keyof ModelStats | `model_name` = `F1`
-  let show_non_compliant: boolean = false
-  let show_details: boolean = false
-  let order: `asc` | `desc` = `desc`
-  let show_n_best: number = MODEL_METADATA.length // show only best models
+  // Accept data prop for SvelteKit compliance (used for testing initial_show_n_best)
+  let { data }: { data?: { initial_show_n_best?: number } } = $props()
+
+  let sort_by: Label = $state(ALL_METRICS.CPS)
+  let show_non_compliant: boolean = $state(true)
+  let show_details: boolean = $state(false)
+  let order: `asc` | `desc` = $state(`desc`)
   const min_models: number = 2
+  // Enforce minimum and maximum when initializing from prop (intentionally captures initial value only)
+  let show_n_best: number = $state(
+    untrack(() =>
+      Math.min(
+        MODELS.length,
+        Math.max(min_models, data?.initial_show_n_best ?? MODELS.length),
+      )
+    ),
+  )
+  let sort_by_path: string = $derived(
+    `${sort_by.path ?? ``}.${sort_by.key}`.replace(/^\./, ``),
+  )
 
-  $: models = MODEL_METADATA.filter(
-    (model) => show_non_compliant || model_is_compliant(model),
-  ).sort((model_1, model_2) => {
-    const metrics_1 = model_1.metrics?.discovery?.full_test_set ?? {}
-    const metrics_2 = model_2.metrics?.discovery?.full_test_set ?? {}
-    const [val_1, val_2] = [metrics_1[sort_by], metrics_2[sort_by]]
+  const metric_keys = [
+    `CPS`,
+    `Accuracy`,
+    `DAF`,
+    `F1`,
+    `MAE`,
+    `Precision`,
+    `R2`,
+    `RMSE`,
+    `TNR`,
+    `TPR`,
+    `κ_SRME`,
+  ] as const
+  const metrics = metric_keys.map((key) => ALL_METRICS[key])
 
-    // Handle null values by sorting last
-    if (val_1 === null && val_2 === null) return 0
-    if (val_1 === null) return 1
-    if (val_2 === null) return -1
-
-    if (typeof val_1 == `string`) {
-      return sort_factor * val_1.localeCompare(val_2)
-    } else if (typeof val_1 == `number` && typeof val_2 == `number`) {
-      // interpret runt_time==0 as infinity
-      if (sort_by == `Run Time (h)`) {
-        if (val_1 == 0) return -sort_factor
-        if (val_2 == 0) return sort_factor
-      }
-      return sort_factor * (val_2 - val_1)
-    } else {
-      throw `Unexpected type '${val_1}' encountered sorting by key '${sort_by}'`
-    }
-  })
-
-  const stats: ModelStatLabel[] = [
-    { key: `Accuracy` },
-    { key: `DAF`, tooltip: `Discovery Acceleration Factor` },
-    { key: `F1` },
-    { key: `MAE`, unit: `eV / atom`, tooltip: `Mean Absolute Error` },
-    { key: `Precision` },
-    { key: `R2`, label: `R<sup>2</sup>` },
-    { key: `RMSE`, unit: `eV / atom`, tooltip: `Root Mean Squared Error` },
-    { key: `TNR`, tooltip: `True Negative Rate` },
-    { key: `TPR`, tooltip: `True Positive Rate` },
-    { key: `Run Time (h)`, label: `Run time`, unit: `h` },
-    {
-      key: `κ<sub>SRME</sub>`,
-      tooltip: `symmetric relative mean error in predicted phonon mode contributions to thermal conductivity κ`,
-    },
-  ]
-
-  export const snapshot: Snapshot = {
-    capture: () => ({ show_details, sort_by, order, show_n_best }),
-    restore: (values) => ({ show_details, sort_by, order, show_n_best } = values),
+  const capture_state = () => ({ show_details, sort_by, order, show_n_best })
+  export const snapshot = {
+    capture: capture_state,
+    restore: (
+      values: ReturnType<typeof capture_state>,
+    ) => ({ show_details, sort_by, order, show_n_best } = values),
   }
-
-  $: sort_factor = { asc: -1, desc: 1 }[order]
-  $: min_val = Math.min(
-    ...models.map((model) => model.metrics?.discovery?.full_test_set[sort_by] as number),
-  )
-  $: max_val = Math.max(
-    ...models.map((model) => model.metrics?.discovery?.full_test_set[sort_by] as number),
-  )
-  $: if (lower_is_better.includes(sort_by)) [min_val, max_val] = [max_val, min_val]
-  $: order = lower_is_better.includes(sort_by) ? `asc` : `desc`
 
   function bg_color(val: number, min: number, max: number) {
-    return cividis(1 - (val - min) / (max - min)).replace(`)`, `, 0.5)`)
+    if (isNaN(val)) return `rgba(255, 255, 255, 0.6)` // Default background for NaN values
+    return interpolateRdBu((val - min) / (max - min))
   }
+
+  let lower_is_better = $derived(metric_better_as(sort_by.key) === `lower`)
+
+  let models = $derived(
+    MODELS.filter((model) => show_non_compliant || model_is_compliant(model)).toSorted(
+      sort_models(sort_by_path, order),
+    ),
+  )
+
+  let [min_val, max_val] = $derived.by(() => {
+    if (!sort_by.better) return [NaN, NaN]
+
+    const vals = models
+      .map((model) => get_nested_value(model, sort_by_path))
+      .filter((val) => typeof val === `number` && !isNaN(val))
+      .toSorted() as number[]
+
+    return [vals.at(0) ?? 0, vals.at(-1) ?? 1]
+  })
+  let [best_val, worst_val] = $derived(
+    lower_is_better ? [max_val, min_val] : [min_val, max_val],
+  )
 </script>
 
-<div style="display: grid; margin: 1vw 3vw;">
-  <h1>Leaderboard</h1>
-
-  <p style="text-align: center;">
-    Sort models by different metrics (thermodynamic stability classification, convex hull
-    distance regressions or tun time).
-  </p>
-
+<div style="display: grid">
   <span>
-    <Toggle bind:checked={show_non_compliant}>Show non-compliant models&ensp;</Toggle>
-    &emsp;&emsp; Sort
+    <input type="checkbox" bind:checked={show_non_compliant} />Show non-compliant models
+    &ensp; &emsp;&emsp; Sort
     <input type="number" min={min_models} max={models.length} bind:value={show_n_best} />
     best models
-    <RadioButtons bind:selected={order} options={[`asc`, `desc`]} /> by:
+    <span class="radio-group">
+      {#each [`asc`, `desc`] as value (value)}
+        <label>
+          <input type="radio" name="order" {value} bind:group={order} /> {value}
+        </label>
+      {/each}
+    </span> by:
   </span>
+
   <ul>
-    {#each [{ key: `model_name`, label: `Model Name` }, ...stats] as { key, label, tooltip }}
-      <li class:active={key == sort_by}>
+    {#each [{ ...METADATA_COLS.model_name, label: `Model Name` }, ...metrics] as
+      prop
+      (prop.key)
+    }
+      {@const { key, label, description } = prop}
+      <li class:active={prop.key == sort_by.key}>
         <button
-          id={key}
-          on:click={() => {
-            sort_by = key
-            order = lower_is_better.includes(key) ? `asc` : `desc`
+          id={prop.key}
+          onclick={() => {
+            sort_by = prop
+            if (key === `Model`) order = `asc` // default to ascending for model name
+            else order = metric_better_as(key) === `lower` ? `asc` : `desc`
           }}
-          style="font-size: large;"
+          style="position: relative"
         >
           {@html label ?? key}
+          {#if description}
+            <span
+              {@attach tooltip({ content: description })}
+              style="width: 10pt; height: 10pt; position: absolute; top: -5pt; right: -5pt; opacity: 0.6"
+            >
+              <Icon icon="Info" />
+            </span>
+          {/if}
         </button>
-        {#if tooltip}
-          <Tooltip
-            text={tooltip}
-            tip_style="white-space: nowrap; font-size: 9pt;"
-            max_width="20em"
-            style="position: absolute; transform: translate(-45%, -45%); color: gray;"
-          >
-            <Icon icon="octicon:info-16" title="Info" height="9pt" />
-          </Tooltip>
-        {/if}
       </li>
     {/each}
   </ul>
 
-  <legend>
-    heading color best
-    <ColorBar color_scale={cividis} style="min-width: min(70vw, 400px);" />
-    worst
+  <legend style:opacity={sort_by.key === METADATA_COLS.model_name.key ? 0 : 1}>
+    <span>
+      {lower_is_better ? `best` : `worst`}
+    </span>
+    <ColorBar
+      title="Card titles colored by {sort_by.label}"
+      title_style="font-size: 1.5em;"
+      color_scale={lower_is_better ? (t) => interpolateRdBu(1 - t) : interpolateRdBu}
+      style="min-width: min(70vw, 400px)"
+      bar_style="height: 14pt;"
+      range={lower_is_better ? [worst_val, best_val] : [best_val, worst_val]}
+    />
+    <span>
+      {lower_is_better ? `worst` : `best`}
+    </span>
   </legend>
 
-  <ol>
+  <ol class="models full-bleed">
     {#each models.slice(0, Math.max(min_models, show_n_best)) as model (model.model_name)}
+      {@const metric_val = sort_by.better ? get_nested_value(model, sort_by_path) : 0}
+      {@const bg_clr = bg_color(metric_val as number, best_val, worst_val)}
+      {@const text_color = luminance(bg_clr) > 0.7 ? `black` : `white`}
       <li
         animate:flip={{ duration: 400 }}
         in:fade={{ delay: 100 }}
         out:fade={{ delay: 100 }}
+        style:grid-row="span {show_details ? 5 : 4}"
       >
         <ModelCard
           {model}
-          {stats}
-          {sort_by}
+          {metrics}
+          sort_by={sort_by_path}
           bind:show_details
-          style="background-color: {bg_color(
-            model.metrics?.discovery?.full_test_set[sort_by],
-            min_val,
-            max_val,
-          )};"
+          title_style="background-color: {bg_clr}; color: {text_color};"
         />
-        <!-- maybe show this text in a tooltip: This model was not trained on the
-        canonical training set. It's results should not be seen as a one-to-one
-        comparison to the other models but rather proof of concept of what is possible. -->
-        <!-- {#if model.training_set}
-          <strong class="train-set">
-            <Icon icon="ion:ios-warning" inline />
-            Custom training set: {model.training_set.title}
-          </strong>
-        {/if} -->
       </li>
     {/each}
   </ol>
 </div>
 
-<!-- link to ALL model pages with hidden links for the crawler -->
-{#each MODEL_METADATA as model}
-  <a href="/models/{model.model_name.toLowerCase().replaceAll(` `, `-`)}" hidden>
+<!-- link to ALL model pages with hidden links for the SvelteKit crawler -->
+{#each MODELS as model (model.model_name)}
+  <a href="/models/{model.model_key}" hidden>
     {model.model_name}
   </a>
 {/each}
@@ -175,6 +182,11 @@
     opacity: 0.8;
     margin: 2em auto;
     font-weight: lighter;
+    align-items: end;
+    transition: opacity 0.4s;
+  }
+  legend span {
+    transform: translateY(4px);
   }
   :is(ul, ol) {
     padding: 0;
@@ -189,23 +201,23 @@
   }
   ul > li button {
     transition: all 0.2s;
-    background-color: rgba(255, 255, 255, 0.1);
   }
   ul > li.active button {
-    background-color: darkcyan;
+    background-color: var(--btn-bg);
   }
   ol {
     display: grid;
-    gap: 2em;
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 1em;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   }
   ol > li {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: var(--blockquote-bg);
     padding: 6pt 10pt 14pt;
     border-radius: 3pt;
     display: grid;
-    align-content: start;
+    grid-template-rows: subgrid;
     position: relative;
+    gap: 1em;
   }
   span {
     display: flex;
@@ -213,25 +225,18 @@
     place-items: center;
     place-content: center;
   }
-  span :global(div.zoo-radio-btn span) {
-    padding: 1pt 4pt;
+  .radio-group {
+    gap: 5pt;
   }
   input[type='number'] {
     text-align: center;
+    transform: scale(1.2);
+    padding: 2pt;
   }
   input[type='number']::-webkit-inner-spin-button {
     display: none;
   }
-  /* strong.train-set {
-    display: block;
-    background-color: rgb(174, 79, 28);
-    color: white;
-    position: absolute;
-    left: 50%;
-    transform: translate(-50%, 50%);
-    bottom: 0;
-    padding: 1pt 3pt;
-    border-radius: 1ex;
-    font-size: smaller;
-  } */
+  input[type='checkbox'] {
+    transform: scale(1.3);
+  }
 </style>

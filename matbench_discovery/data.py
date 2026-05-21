@@ -1,48 +1,47 @@
 """Download, cache and hydrate data files from the Matbench Discovery Figshare article.
 
 https://figshare.com/articles/dataset/22715158
+
+Environment Variables:
+    MBD_AUTO_DOWNLOAD_FILES: Controls whether to auto-download missing data files.
+        Defaults to "true". Set to "false" to be prompted before downloading.
+        This affects both model prediction files and dataset files.
+    MBD_CACHE_DIR: Directory to cache downloaded data files.
+        Defaults to DATA_DIR if the full repo was cloned, otherwise
+        ~/.cache/matbench-discovery.
 """
 
 import io
 import os
+import re
 import sys
 import zipfile
 from collections import defaultdict
 from collections.abc import Callable, Sequence
-from enum import EnumMeta, StrEnum, _EnumDict
 from glob import glob
 from pathlib import Path
-from typing import Any, Literal, Self, TypeVar
+from typing import Any
 
 import ase.io
 import pandas as pd
-import plotly.express as px
-import requests
 import yaml
 from ase import Atoms
+from filelock import FileLock
 from pymatviz.enums import Key
 from ruamel.yaml import YAML
 from tqdm import tqdm
 
-from matbench_discovery import DATA_DIR, ROOT, pkg_is_editable
-from matbench_discovery.enums import MbdKey, TestSubset
-
-# ruff: noqa: T201
-T = TypeVar("T", bound="Files")
-
-# repo URL to raw files on GitHub
-RAW_REPO_URL = "https://github.com/janosh/matbench-discovery/raw"
-# directory to cache downloaded data files
-DEFAULT_CACHE_DIR = os.getenv(
-    "MATBENCH_DISCOVERY_CACHE_DIR",
-    DATA_DIR if pkg_is_editable else os.path.expanduser("~/.cache/matbench-discovery"),
-)
-
+from matbench_discovery import DATA_DIR, TEST_FILES
+from matbench_discovery.enums import DataFiles, MbdKey, Model, TestSubset
 
 round_trip_yaml = YAML()  # round-trippable YAML for updating model metadata files
 round_trip_yaml.preserve_quotes = True
 round_trip_yaml.width = 1000  # avoid changing line wrapping
 round_trip_yaml.indent(mapping=2, sequence=4, offset=2)
+
+
+with open(f"{DATA_DIR}/datasets.yml", encoding="utf-8") as file:
+    DATASETS = yaml.safe_load(stream=file)
 
 
 def as_dict_handler(obj: Any) -> dict[str, Any] | None:
@@ -78,12 +77,34 @@ def glob_to_df(
 
     Raises:
         FileNotFoundError: If no files match the glob pattern.
+        ValueError: If reader is None and the file extension is unrecognized.
     """
-    reader = reader or pd.read_csv if ".csv" in pattern.lower() else pd.read_json
+    if reader is None:
+        if ".csv" in pattern.lower():
+            reader = pd.read_csv
+        elif ".json" in pattern.lower():
+            reader = pd.read_json
+        else:
+            raise ValueError(f"Unsupported file extension in {pattern=}")
 
-    # prefix pattern with ROOT if not absolute path
     files = glob(pattern)
+
     if len(files) == 0:
+        # load mocked model predictions when running pytest (just first 500 lines
+        # from MACE-MPA-0 WBM energy preds)
+        if "pytest" in sys.modules or "CI" in os.environ:
+            df_mock = pd.read_csv(f"{TEST_FILES}/mock-wbm-energy-preds.csv.gz")
+            # .set_index( "material_id" )
+            # make sure pred_cols for all models are present in df_mock
+            for model in Model:
+                with open(model.yaml_path, encoding="utf-8") as file:
+                    model_data = yaml.safe_load(file)
+
+                pred_col = (
+                    model_data.get("metrics", {}).get("discovery", {}).get("pred_col")
+                )
+                df_mock[pred_col] = df_mock[Key.formation_energy_per_atom]
+            return df_mock
         raise FileNotFoundError(f"No files matching glob {pattern=}")
 
     sub_dfs = {}  # used to join slurm job array results into single df
@@ -97,15 +118,17 @@ def glob_to_df(
 def ase_atoms_from_zip(
     zip_filename: str | Path,
     *,
-    file_filter: Callable[[str], bool] = lambda fname: fname.endswith(".extxyz"),
+    file_filter: Callable[[str, int], bool] = lambda filename, _idx: filename.endswith(
+        ".extxyz"
+    ),
     filename_to_info: bool = False,
-    limit: int | None = None,
+    limit: int | slice | None = None,
 ) -> list[Atoms]:
     """Read ASE Atoms objects from a ZIP file containing extXYZ files.
 
     Args:
         zip_filename (str): Path to the ZIP file.
-        file_filter (Callable[[str], bool], optional): Function to check if a file
+        file_filter (Callable[[str, int], bool], optional): Function to check if a file
             should be read. Defaults to lambda fname: fname.endswith(".extxyz").
         filename_to_info (bool, optional): If True, assign filename to Atoms.info.
             Defaults to False.
@@ -118,8 +141,13 @@ def ase_atoms_from_zip(
     atoms_list = []
     with zipfile.ZipFile(zip_filename) as zip_file:
         desc = f"Reading ASE Atoms from {zip_filename=}"
-        for filename in tqdm(zip_file.namelist()[:limit], desc=desc):
-            if not file_filter(filename):
+        filenames = zip_file.namelist()
+        if limit is not None:
+            slice_lim = slice(limit) if isinstance(limit, int) else limit
+            filenames = filenames[slice_lim]
+
+        for idx, filename in tqdm(enumerate(filenames), desc=desc, mininterval=5):
+            if not file_filter(filename, idx):
                 continue
             with zip_file.open(filename) as file:
                 content = io.TextIOWrapper(file, encoding="utf-8").read()
@@ -154,7 +182,8 @@ def ase_atoms_to_zip(
     else:
         atoms_dict = defaultdict(list)
 
-        # If input is a list, get material ID from atoms.info falling back to formula if missing
+        # If input is a list, get material ID from atoms.info falling back to formula
+        # if missing
         for atoms in atoms_set:
             mat_id = atoms.info.get(Key.mat_id, f"no-id-{atoms.get_chemical_formula()}")
             atoms_dict[mat_id] += [atoms]
@@ -178,273 +207,17 @@ def ase_atoms_to_zip(
             zip_file.writestr(f"{mat_id}.extxyz", buffer.getvalue())
 
 
-def download_file(file_path: str, url: str) -> None:
-    """Download the file from the given URL to the given file path."""
-    file_dir = os.path.dirname(file_path)
-    os.makedirs(file_dir, exist_ok=True)
-    try:
-        response = requests.get(url, timeout=5)
-
-        response.raise_for_status()
-
-        with open(file_path, "wb") as file:
-            file.write(response.content)
-    except requests.exceptions.RequestException as exc:
-        print(f"Error downloading {url=}\nto {file_path=}.\n{exc!s}")
-
-
-class MetaFiles(EnumMeta):
-    """Metaclass of Files enum that adds base_dir and (member|label)_map class
-    properties.
-    """
-
-    _base_dir: str
-
-    def __new__(
-        cls,
-        name: str,
-        bases: tuple[type, ...],
-        namespace: _EnumDict,
-        base_dir: str = DEFAULT_CACHE_DIR,
-        **kwargs: Any,
-    ) -> "MetaFiles":
-        """Create new Files enum with given base directory."""
-        obj = super().__new__(cls, name, bases, namespace, **kwargs)
-        obj._base_dir = base_dir  # noqa: SLF001
-        return obj
-
-    # Improvement 2: Add type annotation for cls
-    @property
-    def member_map(cls: type[T]) -> dict[str, "Files"]:  # type: ignore[misc]
-        """Map of member names to member objects."""
-        return cls._member_map_  # type: ignore[return-value]
-
-    @property
-    def label_map(cls: type[T]) -> dict[str, str]:  # type: ignore[misc]
-        """Map of member names to member labels."""
-        return {k: v.label for k, v in cls.member_map.items()}
-
-    @property
-    def base_dir(cls) -> str:
-        """Return the base directory of the file URL."""
-        return cls._base_dir
-
-
-class Files(StrEnum, metaclass=MetaFiles):
-    """Enum of data files with associated file directories and URLs."""
-
-    def __new__(
-        cls, file_path: str, url: str | None = None, label: str | None = None
-    ) -> Self:
-        """Create a new member of the FileUrls enum with a given URL where to load the
-        file from and directory where to save it to.
-        """
-        obj = str.__new__(cls)
-        obj._value_ = file_path.split("/")[-1]  # use file name as enum value
-
-        obj._rel_path = file_path  # type: ignore[attr-defined] # noqa: SLF001
-        obj._url = url  # type: ignore[attr-defined] # noqa: SLF001
-        obj._label = label  # type: ignore[attr-defined] # noqa: SLF001
-
-        return obj
-
-    def __str__(self) -> str:
-        """File path associated with the file URL. Use str(DataFiles.some_key) if you
-        want the absolute file path without auto-downloading the file if it doesn't
-        exist yet, e.g. for use in script that generates the file in the first place.
-        """
-        return f"{type(self).base_dir}/{self._rel_path}"  # type: ignore[attr-defined]
-
-    def __repr__(self) -> str:
-        """Return enum attribute's string representation."""
-        return f"{type(self).__name__}.{self.name}"
-
-    @property
-    def path(self) -> str:
-        """Return the file path associated with the file URL if it exists, otherwise
-        download the file first, then return the path.
-        """
-        key, url, rel_path = self.name, self._url, self._rel_path  # type: ignore[attr-defined]
-        abs_path = f"{type(self).base_dir}/{rel_path}"
-        if not os.path.isfile(abs_path):
-            is_ipython = hasattr(__builtins__, "__IPYTHON__")
-            # default to 'y' if not in interactive session, and user can't answer
-            answer = (
-                input(
-                    f"{abs_path!r} associated with {key=} does not exist. Download it "
-                    "now? This will cache the file for future use. [y/n] "
-                )
-                if is_ipython or sys.stdin.isatty()
-                else "y"
-            )
-            if answer.lower().strip() == "y":
-                if not is_ipython:
-                    print(f"Downloading {key!r} from {url} to {abs_path} for caching")
-                download_file(abs_path, url)
-        return abs_path
-
-    @property
-    def url(self) -> str:
-        """Return the URL associated with the file URL."""
-        return self._url  # type: ignore[attr-defined]
-
-    @property
-    def rel_path(self) -> str:
-        """Return the relative path of the file associated with the file URL."""
-        return self._rel_path  # type: ignore[attr-defined]
-
-    @property
-    def label(self) -> str:
-        """Return the label associated with the file URL."""
-        return self._label  # type: ignore[attr-defined]
-
-
-class DataFiles(Files):
-    """Enum of data files with associated file directories and URLs."""
-
-    mp_computed_structure_entries = (
-        "mp/2023-02-07-mp-computed-structure-entries.json.gz",
-        "https://figshare.com/ndownloader/files/40344436",
-    )
-    mp_elemental_ref_entries = (
-        "mp/2023-02-07-mp-elemental-reference-entries.json.gz",
-        "https://figshare.com/ndownloader/files/40387775",
-    )
-    mp_energies = (
-        "mp/2023-01-10-mp-energies.csv.gz",
-        "https://figshare.com/ndownloader/files/49083124",
-    )
-    mp_patched_phase_diagram = (
-        "mp/2023-02-07-ppd-mp.pkl.gz",
-        "https://figshare.com/ndownloader/files/48241624",
-    )
-    mp_trj_extxyz = (
-        "mp/2024-09-03-mp-trj.extxyz.zip",
-        "https://figshare.com/ndownloader/files/49034296",
-    )
-    # snapshot of every task (calculation) in MP as of 2023-03-16 (14 GB)
-    all_mp_tasks = (
-        "mp/2023-03-16-all-mp-tasks.zip",
-        "https://figshare.com/ndownloader/files/43350447",
-    )
-
-    wbm_computed_structure_entries = (
-        "wbm/2022-10-19-wbm-computed-structure-entries.json.bz2",
-        "https://figshare.com/ndownloader/files/40344463",
-    )
-    wbm_relaxed_atoms = (
-        "wbm/2024-08-04-wbm-relaxed-atoms.extxyz.zip",
-        "https://figshare.com/ndownloader/files/48169600",
-    )
-    wbm_initial_structures = (
-        "wbm/2022-10-19-wbm-init-structs.json.bz2",
-        "https://figshare.com/ndownloader/files/40344466",
-    )
-    wbm_initial_atoms = (
-        "wbm/2024-08-04-wbm-initial-atoms.extxyz.zip",
-        "https://figshare.com/ndownloader/files/48169597",
-    )
-    wbm_cses_plus_init_structs = (
-        "wbm/2022-10-19-wbm-computed-structure-entries+init-structs.json.bz2",
-        "https://figshare.com/ndownloader/files/40344469",
-    )
-    wbm_summary = (
-        "wbm/2023-12-13-wbm-summary.csv.gz",
-        "https://figshare.com/ndownloader/files/44225498",
-    )
-    alignn_checkpoint = (
-        "2023-06-02-pbenner-best-alignn-model.pth.zip",
-        "https://figshare.com/ndownloader/files/41233560",
-    )
-    mp_trj = (
-        "mp/2022-09-16-mp-trj.json",
-        "https://figshare.com/ndownloader/files/41619375",
-    )
-
-
 df_wbm = pd.read_csv(DataFiles.wbm_summary.path)
 # str() around Key.mat_id added for https://github.com/janosh/matbench-discovery/issues/81
 df_wbm.index = df_wbm[str(Key.mat_id)]
 
 
-# ruff: noqa: E501, ERA001 (ignore long lines in class Model)
-class Model(Files, base_dir=f"{ROOT}/models"):
-    """Data files provided by Matbench Discovery.
-    See https://janosh.github.io/matbench-discovery/contribute for data descriptions.
-    """
-
-    alignn = "alignn/2023-06-02-alignn-wbm-IS2RE.csv.gz", "alignn/alignn.yml", "ALIGNN"
-    # alignn_pretrained = "alignn/2023-06-03-mp-e-form-alignn-wbm-IS2RE.csv.gz", "alignn/alignn.yml", "ALIGNN Pretrained"
-    # alignn_ff = "alignn_ff/2023-07-11-alignn-ff-wbm-IS2RE.csv.gz", "alignn/alignn-ff.yml", "ALIGNN FF"
-
-    # BOWSR optimizer coupled with original megnet
-    bowsr_megnet = "bowsr/2023-01-23-bowsr-megnet-wbm-IS2RE.csv.gz", "bowsr/bowsr.yml", "BOWSR"  # fmt: skip
-
-    # default CHGNet model from publication with 400,438 params
-    chgnet = "chgnet/2023-12-21-chgnet-0.3.0-wbm-IS2RE.csv.gz", "chgnet/chgnet.yml", "CHGNet"  # fmt: skip
-    # chgnet_no_relax = "chgnet/2023-12-05-chgnet-0.3.0-wbm-IS2RE-no-relax.csv.gz", None, "CHGNet No Relax"
-
-    # CGCNN 10-member ensemble
-    cgcnn = "cgcnn/2023-01-26-cgcnn-ens=10-wbm-IS2RE.csv.gz", "cgcnn/cgcnn.yml", "CGCNN"
-
-    # CGCNN 10-member ensemble with 5-fold training set perturbations
-    cgcnn_p = "cgcnn/2023-02-05-cgcnn-perturb=5-wbm-IS2RE.csv.gz", "cgcnn/cgcnn+p.yml", "CGCNN+P"  # fmt: skip
-
-    # original M3GNet straight from publication, not re-trained
-    m3gnet = "m3gnet/2023-12-28-m3gnet-wbm-IS2RE.csv.gz", "m3gnet/m3gnet.yml", "M3GNet"
-    # m3gnet_direct = "m3gnet/2023-05-30-m3gnet-direct-wbm-IS2RE.csv.gz", None, "M3GNet DIRECT"
-    # m3gnet_ms = "m3gnet/2023-06-01-m3gnet-manual-sampling-wbm-IS2RE.csv.gz", None, "M3GNet MS"
-
-    # MACE-MP as published in https://arxiv.org/abs/2401.00096 trained on MPtrj
-    mace = "mace/2023-12-11-mace-wbm-IS2RE-FIRE.csv.gz", "mace/mace.yml", "MACE"
-    # mace_alex = "mace/2024-08-09-mace-wbm-IS2RE-FIRE.csv.gz", None, "MACE Alex"
-    # https://github.com/ACEsuit/mace-mp/releases/tag/mace_mp_0b
-    # mace_0b = "mace/2024-07-20-mace-wbm-IS2RE-FIRE.csv.gz", None, "MACE 0b"
-
-    # original MEGNet straight from publication, not re-trained
-    megnet = "megnet/2022-11-18-megnet-wbm-IS2RE.csv.gz", "megnet/megnet.yml", "MEGNet"
-
-    # SevenNet trained on MPtrj
-    sevennet = "sevennet/2024-07-11-sevennet-preds.csv.gz", "sevennet/sevennet.yml", "SevenNet"  # fmt: skip
-
-    # Magpie composition+Voronoi tessellation structure features + sklearn random forest
-    voronoi_rf = "voronoi_rf/2022-11-27-train-test/e-form-preds-IS2RE.csv.gz", "voronoi_rf/voronoi-rf.yml", "Voronoi RF"  # fmt: skip
-
-    # wrenformer 10-member ensemble
-    wrenformer = "wrenformer/2022-11-15-wrenformer-ens=10-IS2RE-preds.csv.gz", "wrenformer/wrenformer.yml", "Wrenformer"  # fmt: skip
-
-    # --- Proprietary Models
-    # GNoME
-    gnome = "gnome/2023-11-01-gnome-preds-50076332.csv.gz", "gnome/gnome.yml", "GNoME"
-
-    # MatterSim
-    mattersim = "mattersim/2024-06-16-mattersim-wbm-IS2RE.csv.gz", "mattersim/mattersim.yml", "MatterSim"  # fmt: skip
-
-    # ORB
-    orb = "orb/orbff-v2-20241011.csv.gz", "orb/orb.yml", "ORB"
-    orb_mptrj = "orb/orbff-mptrj-only-v2-20241014.csv.gz", "orb/orb-mptrj.yml", "ORB MPtrj"  # fmt: skip
-
-    # fairchem
-    eqv2_s_dens = "eqV2/eqV2-s-dens-mp.csv.gz", "eqV2/eqV2-s-dens-mp.yml", "eqV2 S DeNS"  # fmt: skip
-    eqv2_m = "eqV2/eqV2-m-omat-mp-salex.csv.gz", "eqV2/eqV2-m-omat-mp-salex.yml", "eqV2 M"  # fmt: skip
-
-    # --- Model Combos
-    # # CHGNet-relaxed structures fed into MEGNet for formation energy prediction
-    # chgnet_megnet = "chgnet/2023-03-06-chgnet-0.2.0-wbm-IS2RE.csv.gz", None, "CHGNet→MEGNet"
-    # # M3GNet-relaxed structures fed into MEGNet for formation energy prediction
-    # m3gnet_megnet = "m3gnet/2022-10-31-m3gnet-wbm-IS2RE.csv.gz", None, "M3GNet→MEGNet"
-    # megnet_rs2re = "megnet/2023-08-23-megnet-wbm-RS2RE.csv.gz", None, "MEGNet RS2RE"
-
-
-px.defaults.labels |= Model.label_map
-
-
 def load_df_wbm_with_preds(
     *,
-    models: Sequence[str] = (),
+    models: Sequence[str | Model] = (),
     pbar: bool = True,
     id_col: str = Key.mat_id,
-    subset: pd.Index | Sequence[str] | Literal[TestSubset.uniq_protos] | None = None,
+    subset: pd.Index | Sequence[str] | TestSubset | None = None,
     max_error_threshold: float | None = 5.0,
     **kwargs: Any,
 ) -> pd.DataFrame:
@@ -477,29 +250,26 @@ def load_df_wbm_with_preds(
     valid_models = {model.name for model in Model}
     if models == ():
         models = tuple(valid_models)
-    inv_label_map = {v: k for k, v in Model.label_map.items()}
+    inv_label_map = {key.label: key.name for key in Model}
     # map pretty model names back to Model enum keys
-    models = {inv_label_map.get(model, model) for model in models}
-    if unknown_models := ", ".join(models - valid_models):
+    models = [inv_label_map.get(model, model) for model in models]
+    if unknown_models := ", ".join(set(models) - valid_models):
         raise ValueError(f"{unknown_models=}, expected subset of {valid_models}")
 
     model_name: str = ""
-    from matbench_discovery.data import df_wbm
-
     df_out = df_wbm.copy()
 
     try:
         prog_bar = tqdm(models, disable=not pbar, desc="Loading preds")
         for model_name in prog_bar:
             prog_bar.set_postfix_str(model_name)
-            pred_file = Model[model_name]
-            df_preds = glob_to_df(pred_file.path, pbar=False, **kwargs)
 
-            # Get prediction column name from metadata
-            model_key = getattr(Model, model_name)
-            model_label = model_key.label
-            model_yaml_path = f"{Model.base_dir}/{model_key.url}"
-            with open(model_yaml_path) as file:
+            # use getattr(name) in case model_name is already a Model enum
+            model = Model[getattr(model_name, "name", model_name)]
+
+            df_preds = glob_to_df(model.discovery_path, pbar=False, **kwargs)
+
+            with open(model.yaml_path, encoding="utf-8") as file:
                 model_data = yaml.safe_load(file)
 
             pred_col = (
@@ -507,22 +277,25 @@ def load_df_wbm_with_preds(
             )
             if not pred_col:
                 raise ValueError(
-                    f"pred_col not specified for {model_name} in {model_yaml_path!r}"
+                    f"pred_col not specified for {model_name} in {model.yaml_path!r}"
                 )
 
             if pred_col not in df_preds:
-                raise ValueError(f"{pred_col=} not found in {pred_file.path}")
+                raise ValueError(
+                    f"{pred_col=} set in {model.yaml_path!r}:metrics.discovery."
+                    f"pred_col not found in {model.discovery_path}"
+                )
 
-            df_out[model_label] = df_preds.set_index(id_col)[pred_col]
+            df_out[model.label] = df_preds.set_index(id_col)[pred_col]
             if max_error_threshold is not None:
                 if max_error_threshold < 0:
                     raise ValueError("max_error_threshold must be a positive number")
                 # Apply centralized model prediction cleaning criterion (see doc string)
                 bad_mask = (
-                    abs(df_out[model_label] - df_out[MbdKey.e_form_dft])
+                    abs(df_out[model.label] - df_out[MbdKey.e_form_dft])
                 ) > max_error_threshold
-                df_out.loc[bad_mask, model_label] = pd.NA
-                n_preds, n_bad = len(df_out[model_label].dropna()), sum(bad_mask)
+                df_out.loc[bad_mask, model.label] = pd.NA
+                n_preds, n_bad = len(df_out[model.label].dropna()), sum(bad_mask)
                 if n_bad > 0:
                     print(
                         f"{n_bad:,} of {n_preds:,} unrealistic preds for {model_name}"
@@ -532,8 +305,67 @@ def load_df_wbm_with_preds(
         raise
 
     if subset == TestSubset.uniq_protos:
-        df_out = df_out.query(Key.uniq_proto)
+        df_out = df_out.query(MbdKey.uniq_proto)
     elif subset is not None:
         df_out = df_out.loc[subset]
 
     return df_out
+
+
+def update_yaml_file(
+    file_path: str | Path,
+    dotted_path: str,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """Update a YAML file at a specific dotted path with new data.
+
+    Uses file locking to prevent race conditions when multiple processes
+    try to update the same file simultaneously.
+
+    Args:
+        file_path (str | Path): Path to YAML file to update
+        dotted_path (str): Dotted path to update (e.g. 'metrics.discovery')
+        data (dict[str, Any]): Data to write at the specified path
+
+    Returns:
+        dict[str, Any]: The complete updated YAML data written to file.
+
+    Example:
+        update_yaml_file(
+            "models/mace/mace-mp-0.yml",
+            "metrics.discovery",
+            dict(mae=0.1, rmse=0.2),
+        )
+    """
+    # raise on repeated or trailing dots in dotted path
+    if not re.match(r"^[a-zA-Z0-9-+=_]+(\.[a-zA-Z0-9-+=_]+)*$", dotted_path):
+        raise ValueError(f"Invalid {dotted_path=}")
+
+    # Use a lock file to prevent race conditions
+    lock_path = f"{file_path}.lock"
+    with FileLock(lock_path):
+        with open(file_path, encoding="utf-8") as file:
+            yaml_data = round_trip_yaml.load(file)
+
+        # Navigate to the correct nested level
+        current = yaml_data
+        *parts, last = dotted_path.split(".")
+
+        for part in parts:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+
+        # Update the data at the final level
+        if last not in current or current[last] is None:
+            current[last] = {}
+        for key, val in current[last].items():
+            data.setdefault(key, val)
+        # Replace the entire current[last] section to preserve comments
+        current[last] = data
+
+        # Write back to file
+        with open(file_path, mode="w", encoding="utf-8") as file:
+            round_trip_yaml.dump(yaml_data, file)
+
+        return yaml_data

@@ -3,7 +3,6 @@
 # %%
 import os
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import pymatviz as pmv
 from pymatgen.core import Structure
@@ -11,8 +10,8 @@ from pymatviz.enums import Key
 
 from matbench_discovery import PDF_FIGS
 from matbench_discovery import plots as plots
-from matbench_discovery.data import DataFiles, Model, df_wbm
-from matbench_discovery.preds import df_preds
+from matbench_discovery.data import df_wbm
+from matbench_discovery.enums import DataFiles, Model
 
 __author__ = "Janosh Riebesell"
 __date__ = "2023-03-06"
@@ -21,7 +20,7 @@ module_dir = os.path.dirname(__file__)
 
 
 # %%
-df_chgnet = df_chgnet_v030 = pd.read_csv(Model.chgnet.path)
+df_chgnet = df_chgnet_v030 = pd.read_csv(Model.chgnet_030.discovery_path)
 df_chgnet_v020 = pd.read_csv(
     f"{module_dir}/2023-03-06-chgnet-0.2.0-wbm-IS2RE.csv.gz", index_col=Key.mat_id
 )
@@ -52,7 +51,7 @@ df_diff.reset_index().plot.scatter(
     y=e_form_2000,
     hover_name=Key.mat_id,
     hover_data=[Key.formula],
-    backend=pmv.utils.PLOTLY,
+    backend="plotly",
     title=f"{len(df_diff)} structures have > {min_e_diff} eV/atom energy diff after "
     "longer relaxation",
 )
@@ -66,30 +65,32 @@ fig.show()
 
 
 # %%
-df_cse = pd.read_json(DataFiles.wbm_cses_plus_init_structs.path).set_index(Key.mat_id)
-df_cse.loc[df_diff.index].reset_index().to_json(
+df_wbm_init_structs = pd.read_json(
+    DataFiles.wbm_initial_structures.path, lines=True
+).set_index(Key.mat_id)
+df_wbm_init_structs.loc[df_diff.index].reset_index().to_json(
     f"{module_dir}/wbm-chgnet-bad-relax.json.gz"
 )
 
 
 # %%
-n_rows, n_cols = 3, 4
-fig, axs = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 4 * n_rows))
-n_struct = min(n_rows * n_cols, len(df_diff))
+n_struct = min(12, len(df_diff))  # 3 rows x 4 cols = 12 structures
 struct_col = Key.init_struct
 
-fig.suptitle(f"{n_struct} {struct_col} {title}", fontsize=16, fontweight="bold", y=1.05)
-for idx, row in enumerate(df_cse.loc[df_diff.index].itertuples(), start=1):
-    struct = Structure.from_dict(getattr(row, struct_col))
-    ax = pmv.structure_2d(struct, ax=axs.flat[idx - 1])
-    _, spg_num = struct.get_space_group_info()
-    formula = struct.composition.reduced_formula
-    ax.set_title(f"{idx}. {formula} (spg={spg_num})\n{row.Index}", fontweight="bold")
+# Get first n_struct structures from df_wbm_init_structs
+structures = {
+    f"{idx} {(struct := Structure.from_dict(row[struct_col])).reduced_formula} "
+    f"(spg={struct.get_space_group_info()[1]})": struct
+    for idx, row in df_wbm_init_structs.loc[df_diff.index].head(n_struct).iterrows()
+}
+fig = pmv.structure_2d(structures, n_cols=4)
+fig.layout.title.update(text=f"<b>{n_struct} {struct_col} {title}</b>")
 
 pmv.save_fig(fig, f"{PDF_FIGS}/chgnet-bad-relax-structures.pdf")
+fig.show()
 
 
 # %% ensure all CHGNet static predictions (direct energy without any structure
 # relaxation) are higher in energy than the relaxed ones, i.e. that the optimizer is
 # working correctly
-pmv.density_scatter(df=df_preds, x="CHGNet", y="chgnet_no_relax")
+pmv.density_scatter(df=df_chgnet, x="CHGNet", y="chgnet_no_relax")

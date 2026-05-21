@@ -1,155 +1,171 @@
 <script lang="ts">
-  import type { ModelData, ModelStatLabel } from '$lib'
-  import { AuthorBrief } from '$lib'
-  import TRAINING_SETS from '$root/data/training-sets.yml'
-  import { repository } from '$site/package.json'
-  import Icon from '@iconify/svelte'
-  import { pretty_num } from 'elementari'
-  import { Tooltip } from 'svelte-zoo'
+  import type { Label, ModelData } from '$lib'
+  import { AuthorBrief, DATASETS } from '$lib'
+  import pkg from '$site/package.json'
+  import { format_num, Icon } from 'matterviz'
+  import { tooltip } from 'svelte-multiselect/attachments'
+  import type { HTMLAttributes } from 'svelte/elements'
   import { fade, slide } from 'svelte/transition'
 
-  export let model: ModelData
-  export let stats: ModelStatLabel[]
-  export let sort_by: keyof ModelData
-  export let show_details: boolean = false
-  export let style: string | null = null
-  export let metrics_style: string | null = null
+  let {
+    model,
+    metrics,
+    sort_by,
+    show_details = $bindable(false),
+    metrics_style = ``,
+    title_style = ``,
+    ...rest
+  }: HTMLAttributes<HTMLElementTagNameMap[`section`]> & {
+    model: ModelData
+    metrics: readonly Label[]
+    sort_by: keyof ModelData
+    show_details?: boolean
+    metrics_style?: string
+    title_style?: string
+  } = $props()
 
-  $: ({ model_name } = model)
-  $: ({ model_params, hyperparams, notes = {}, training_set, n_estimators } = model)
-  $: discovery_metrics = model.metrics?.discovery?.full_test_set ?? {}
-  $: ({ missing_preds, missing_percent } = discovery_metrics)
+  let { model_name, model_key, model_params, training_set } = $derived(model)
+  let all_metrics = $derived({
+    ...(typeof model.metrics?.discovery === `object`
+      ? model.metrics.discovery.unique_prototypes
+      : {}),
+    ...(typeof model.metrics?.phonons === `object`
+      ? model.metrics?.phonons.kappa_103
+      : {}),
+    CPS: model.CPS,
+  })
+  let { missing_preds } = $derived(all_metrics)
 
-  $: links = [
-    [model.repo, `Repo`, `octicon:mark-github`],
-    [model.paper, `Paper`, `ion:ios-paper`],
-    [model.url, `Docs`, `ion:ios-globe`],
-    [`${repository}/blob/-/models/${model.dirname}`, `Files`, `octicon:file-directory`],
-  ]
+  let links = $derived(
+    [
+      [model.repo, `Repo`, `GitHub`],
+      [model.paper, `Paper`, `Paper`],
+      [model.url, `Docs`, `Docs`],
+      [model.checkpoint_url, `Checkpoint`, `Download`],
+      [`${pkg.repository}/blob/-/models/${model.dirname}`, `Files`, `Directory`],
+    ] as const,
+  )
   const target = { target: `_blank`, rel: `noopener` }
-  $: model_slug = model_name?.toLowerCase().replaceAll(` `, `-`) ?? ``
-  $: n_model_params = pretty_num(model_params, `.3~s`)
+  let n_model_params = $derived(format_num(model_params, `.3~s`))
+  let expand_title = $derived(
+    `${show_details ? `Hide` : `Show`} authors and package versions`,
+  )
 </script>
 
-<h2 id={model_slug} {style}>
-  <a href="/models/{model_slug}">{model_name}</a>
+<h2 style={title_style}>
+  <a href="/models/{model_key}">{model_name}</a>
   <button
-    on:click={() => (show_details = !show_details)}
-    title="{show_details ? `Hide` : `Show`} authors and package versions"
+    onclick={() => (show_details = !show_details)}
+    aria-expanded={show_details}
+    aria-label={expand_title}
+    title={expand_title}
+    style={title_style}
   >
-    <!-- change between expand/collapse icon -->
-    <Icon icon={show_details ? `ion:ios-arrow-up` : `ion:ios-arrow-down`} inline />
+    <Icon icon="Arrow{show_details ? `Up` : `Down`}" />
   </button>
 </h2>
 <nav>
-  {#each links.filter(([href]) => href) as [href, title, icon]}
+  {#each links.filter(([href]) => href?.startsWith(`http`)) as
+    [href, title, icon]
+    (title)
+  }
     <span>
-      <Icon {icon} inline />
+      <Icon {icon} />
       <a {href} {...target}>{title}</a>
     </span>
   {/each}
 </nav>
-<p>
+
+<section class="metadata" {...rest}>
+  {#if training_set}
+    <span style="grid-column: span 2">
+      <Icon icon="Database" />
+      Training data:
+      {#each training_set as train_set_key, idx (train_set_key)}
+        {#if idx > 0}
+          &nbsp;+&nbsp;
+        {/if}
+        {@const dataset = DATASETS[train_set_key]}
+        {#if dataset}
+          {@const { n_structures, name, slug, n_materials } = dataset}
+          {@const pretty_n_mat = typeof n_materials === `number`
+        ? format_num(n_materials)
+        : n_materials}
+          {@const n_mat_str = n_materials ? ` from ${pretty_n_mat} materials` : ``}
+          <a
+            href="/data/{slug}"
+            title="{name}: {format_num(n_structures)} structures{n_mat_str}"
+            {@attach tooltip()}
+          >{train_set_key}</a>
+        {:else}
+          <span title="Unknown dataset key: {train_set_key}">{train_set_key}</span>
+        {/if}
+      {/each}
+    </span>
+  {/if}
   <span title="Date added">
-    <Icon icon="ion:ios-calendar" inline />
+    <Icon icon="Calendar" />
     Added {model.date_added}
   </span>
   {#if model.date_published}
     <span title="Date published">
-      <Icon icon="ri:calendar-check-line" inline />
+      <Icon icon="CalendarCheck" />
       Published {model.date_published}
     </span>
   {/if}
   <span>
-    <Icon icon="eos-icons:neural-network" inline />
-    {n_model_params} params
+    <Icon icon="NeuralNetwork" /> {n_model_params} params
   </span>
-  {#if n_estimators > 1}
+  {#if model.n_estimators > 1}
     <span>
-      <Icon icon="material-symbols:forest" inline />
-      Ensemble of {n_estimators > 1 ? `${n_estimators}` : ``}
-      <Tooltip
-        text="This result used a model ensemble with {n_estimators} members with {n_model_params} parameters each."
+      <Icon icon="Forest" />
+      Ensemble of {model.n_estimators}
+      <span
+        title="This result used a model ensemble with {model.n_estimators} members with {n_model_params} parameters each."
+        {@attach tooltip()}
       >
-        <Icon icon="ion:information-circle" inline />
-      </Tooltip>
+        &nbsp;<Icon icon="Info" />
+      </span>
     </span>
   {/if}
-  <span>
-    <Icon icon="fluent:missing-metadata-24-regular" inline />
-    Missing preds:
-    {pretty_num(missing_preds, `,.0f`)}
-    <small>({missing_percent})</small>
-    {#if notes?.missing_preds}
-      <Tooltip
-        text={notes.missing_preds ?? ``}
-        tip_style="font-size: 9pt;"
-        max_width="20em"
-        min_width="20em"
-      >
-        <Icon icon="ion:information-circle" inline />
-      </Tooltip>
+  <span
+    {@attach tooltip()}
+    title="Out of {format_num(DATASETS.WBM.n_structures, `,`)} WBM structures, {format_num(missing_preds ?? 0, `,`)} are missing predictions. This refers only to the discovery task of predicting WBM convex hull distances."
+  >
+    <Icon icon="MissingMetadata" /> Missing preds:
+    {format_num(missing_preds ?? 0, `,.0f`)}
+    {#if missing_preds && missing_preds > 0}
+      <small>({format_num(missing_preds / DATASETS.WBM.n_structures, `.3~%`)})</small>
     {/if}
   </span>
-  {#if training_set}
-    {@const training_sets = Array.isArray(training_set) ? training_set : [training_set]}
-    <span style="grid-column: span 2;">
-      <Icon icon="mdi:database" inline />
-      Training set:
-      {#each training_sets as training_set_or_key, idx}
-        {#if idx > 0}
-          &nbsp;+&nbsp;
-        {/if}
-        {@const training_set =
-          typeof training_set_or_key == `string`
-            ? TRAINING_SETS[training_set_or_key]
-            : training_set_or_key}
-        {@const { n_structures, url, title, n_materials } = training_set}
-        {@const pretty_n_mat =
-          typeof n_materials == `number` ? pretty_num(n_materials) : n_materials}
-        {@const n_mat_str = n_materials ? ` from ${pretty_n_mat} materials` : ``}
-        <a href={url}>{title}</a>
-        <small>
-          ({pretty_num(n_structures)} structures{n_mat_str})
-        </small>
-      {/each}
-    </span>
-  {/if}
-</p>
+</section>
 {#if show_details}
   <div transition:fade|fly={{ duration: 200 }}>
     <section transition:slide={{ duration: 200 }}>
       <h3>Authors</h3>
       <ul>
         {#each model.authors as author (author.name)}
-          <li>
-            <AuthorBrief {author} />
-          </li>
+          <li><AuthorBrief {author} /></li>
         {/each}
       </ul>
       {#if model.trained_by}
         <h3>Trained By</h3>
         <ul>
           {#each model.trained_by as author (author.name)}
-            <li>
-              <AuthorBrief {author} />
-            </li>
+            <li><AuthorBrief {author} /></li>
           {/each}
         </ul>
       {/if}
     </section>
-    <section
-      transition:slide={{ duration: 200 }}
-      style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis;"
-    >
+    <section transition:slide={{ duration: 200 }}>
       <h3>Package versions</h3>
       <ul>
-        {#each Object.entries(model.requirements ?? {}) as [name, version]}
-          {@const [href, link_text] = version.startsWith(`http`)
-            ? // version.split(`/`).at(-1) assumes final part after / of URL is the package version, as is the case for GitHub releases
-              [version, version.split(`/`).at(-1)]
-            : [`https://pypi.org/project/${name}/${version}`, version]}
-          <li style="font-size: smaller;">
+        {#each Object.entries(model.requirements ?? {}) as [name, version] (name)}
+          {@const [href, link_text] = version?.startsWith(`http`)
+          // version.split(`/`).at(-1) assumes final part after / of URL is the package version, as is the case for GitHub releases
+          ? [version, version.split(`/`).at(-1)]
+          : [`https://pypi.org/project/${name}/${version}`, version]}
+          <li style="font-size: smaller">
             {name}: <a {href} {...target}>{link_text}</a>
           </li>
         {/each}
@@ -157,53 +173,26 @@
     </section>
   </div>
 {/if}
-<section class="metrics" style={metrics_style}>
-  <h3>Metrics</h3>
+
+<section class="metrics" style={metrics_style || null}>
+  <h3 style="margin: 0; font-weight: normal">Metrics</h3>
   <ul>
     <!-- hide run time if value is 0 (i.e. not available) -->
-    {#each stats.filter(({ key }) => key != `Run Time (h)` || discovery_metrics[key] > 0) as { key, label, unit }}
+    {#each metrics as metric (JSON.stringify(metric))}
+      {@const { key, label, unit } = metric}
+      {@const value = all_metrics[key as keyof typeof all_metrics] as number}
       <li class:active={sort_by == key}>
         <label for={key}>{@html label ?? key}</label>
-        <strong>{pretty_num(discovery_metrics[key])} <small>{unit ?? ``}</small></strong>
+        <strong>{isNaN(Number(value)) ? `n/a` : format_num(value)}
+          <small>{unit ?? ``}</small></strong>
       </li>
     {/each}
   </ul>
 </section>
-{#if hyperparams && show_details}
-  <section>
-    <h3>Hyperparameters</h3>
-    <ul>
-      {#each Object.entries(hyperparams) as [key, value]}
-        <li>
-          {key}:
-          {#if typeof value == `object`}
-            <ul>
-              {#each Object.entries(value) as [k, v]}
-                <li><code>{k} = {v}</code></li>
-              {/each}
-            </ul>
-          {:else}
-            {value}
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  </section>
-{/if}
-{#if notes && show_details}
-  <section>
-    <h3>Notes</h3>
-    <ul>
-      {#each [`Description`, `Training`].filter((key) => key in (notes ?? {})) as key}
-        <li>{@html notes[key]}</li>
-      {/each}
-    </ul>
-  </section>
-{/if}
 
 <style>
   h2 {
-    margin: 8pt 0 1em;
+    margin: 8pt 0 0;
     text-align: center;
     border-radius: 5pt;
   }
@@ -214,9 +203,6 @@
     background: none;
     padding: 0;
     font: inherit;
-  }
-  h3 {
-    margin: 1ex 0 3pt;
   }
   ul {
     list-style: disc;
@@ -233,10 +219,12 @@
     gap: 6pt;
     place-items: center;
   }
-  p {
+  section.metadata {
     display: grid;
-    gap: 5pt;
+    gap: 9pt 5pt;
     grid-template-columns: 1fr 1fr;
+    font-size: 0.95em;
+    align-content: center;
   }
   div {
     display: grid;
@@ -249,12 +237,12 @@
     font-size: 8pt;
   }
   section.metrics > ul {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9em, 1fr));
     gap: 3pt 1em;
     list-style: none;
-    flex-direction: column;
     max-height: 10em;
+    padding: 0;
   }
   section.metrics > ul > li {
     font-weight: lighter;
@@ -265,13 +253,11 @@
     padding: 0 4pt;
     border-radius: 3pt;
   }
-  section.metrics > ul > li > strong {
-    background-color: rgba(0, 0, 0, 0.25);
-  }
-  section.metrics > ul > li.active > strong {
-    background-color: teal;
-  }
   section.metrics > ul > li.active > label {
     font-weight: bold;
+  }
+  /* prevent long from increasing ModelCard container width */
+  :is(section, div, nav) {
+    word-break: break-word;
   }
 </style>

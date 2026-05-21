@@ -1,36 +1,48 @@
 # package install
 *.egg-info
 dist
+build
+.coverage*
 
 # cache
 __pycache__
+.cache
 
 # datasets
 *.pth.tar
 *.json.gz
 *.json.bz2
-*.csv.bz2
+*.csv.*
 *.pkl.gz
 data/**/raw
 data/**/tsne
 !data/mp/2023-02-07-mp-elemental-reference-entries.json.gz
-models/**/checkpoints
 data/**/*.extxyz*
 data/**/*.json*
 data/**/*.zip*
+data/wbm/*symprec=*.csv*
 !data/**/*umap-projections.csv.bz2
-
-# Checkpoints
-*.pth.tar
-*.pt
 
 # slurm + Weights and Biases logs
 wandb/
-*slurm-*.log
+models/**/*.log
 
-# generated docs
+# model checkpoints and prediction files
+models/**/*.model
+models/**/*.pt
+models/**/*.tgz
+models/**/*.csv*
+models/**/*.json*
+
+# WIP model submissions
+models/_*
+
+# auto-generated docs
 site/src/routes/api/*.md
 
-# temporary ignore rules
-2023-02-05-ens=10-perturb=5
-data/mp/mptrj-gga-ggapu/*
+# large files
+data/*-models-geo-opt-analysis-symprec=*.csv.gz
+.cursor
+
+# astral
+*.lock

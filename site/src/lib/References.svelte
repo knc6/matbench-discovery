@@ -1,38 +1,47 @@
 <script lang="ts">
   import type { Reference } from '$lib'
-  import { beforeUpdate } from 'svelte'
+  import type { HTMLAttributes } from 'svelte/elements'
 
-  export let references: Reference[]
-  export let ref_selector: string = `a.ref[href^='#']`
-  export let found_on_page: Reference[] = references
-  export let n_authors: number = 1
-  export let first_name_mode: `initial` | `full` | `none` = `none`
+  let {
+    references,
+    ref_selector = `a.ref[href^='#']`,
+    found_on_page = $bindable(references),
+    n_authors = 1,
+    first_name_mode = `none`,
+    ...rest
+  }: HTMLAttributes<HTMLOListElement> & {
+    references: Reference[]
+    ref_selector?: string
+    found_on_page?: Reference[]
+    n_authors?: number
+    first_name_mode?: `initial` | `full` | `none`
+  } = $props()
 
   function filter_refs() {
     const ref_links = document.querySelectorAll<HTMLAnchorElement>(ref_selector)
-    const hashes = Array.from(ref_links).map((ref) => ref.hash)
-    found_on_page = references.filter((ref) => hashes.includes(`#${ref.id}`))
+    const hashes = new Set([...ref_links].map((ref) => ref.hash))
+    found_on_page = references.filter((ref) => hashes.has(`#${ref.id}`))
   }
-  beforeUpdate(filter_refs)
+  $effect.pre(filter_refs)
 </script>
 
 {#key found_on_page}
-  <ol>
+  <ol {...rest}>
     {#each found_on_page as { title, id, author, DOI, URL: href, issued } (id)}
       <li>
         <p {id}>{title}</p>
         <span>
           {@html author
-            .slice(0, n_authors)
-            .map(({ given, family }) => {
-              const first_name = {
-                initial: `${given[0]}. `,
-                full: `${given} `,
-                none: ``,
-              }[first_name_mode]
-              return `${first_name ?? ``}${family}`
-            })
-            .join(`,&thinsp; `)}
+          .slice(0, n_authors)
+          .map(({ given, family }) => {
+            const first_name = {
+              initial: `${given[0]}. `,
+              full: `${given} `,
+              none: ``,
+            }[first_name_mode]
+            return `${first_name ?? ``}${family}`
+          })
+          .join(`,&thinsp; `)}
           {#if author.length > n_authors}
             <em>et al.</em>
           {/if}

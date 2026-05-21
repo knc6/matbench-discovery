@@ -1,26 +1,35 @@
 <script lang="ts">
-  import type { ChemicalElement } from 'elementari'
-  import { pretty_num } from 'elementari'
+  import type { ChemicalElement, ElementSymbol } from 'matterviz'
+  import { format_num } from 'matterviz'
+  import type { HTMLAttributes } from 'svelte/elements'
 
-  export let element: ChemicalElement
-  export let elem_counts: number[] | Record<string, number>
-  export let style: string | null = null
-  export let show_percent: boolean = true
-  export let unit: string = ``
+  let { element, elem_counts, show_percent = true, unit = ``, ...rest }: {
+    element: ChemicalElement
+    elem_counts: number[] | Record<ElementSymbol, number>
+    show_percent?: boolean
+    unit?: string
+  } & HTMLAttributes<HTMLElementTagNameMap[`strong`]> = $props()
 
-  $: value = elem_counts[element?.symbol] ?? elem_counts[element?.number - 1] ?? null
-  $: total = (
-    Array.isArray(elem_counts) ? elem_counts : Object.values(elem_counts)
-  ).reduce((a, b) => a + b, 0)
+  let value = $derived(
+    Array.isArray(elem_counts)
+      ? (elem_counts[element?.number - 1] ?? null)
+      : (elem_counts[element?.symbol] ?? null),
+  )
+  let total = $derived(
+    (Array.isArray(elem_counts) ? elem_counts : Object.values(elem_counts)).reduce(
+      (total, count) => total + count,
+      0,
+    ),
+  )
 </script>
 
-<strong {style}>
+<strong {...rest}>
   {#if element?.name}
-    {element?.name}: {pretty_num(value)}
+    {element?.name}: {format_num(value)}
     {@html unit}
     <!-- compute percent of total -->
     {#if show_percent && total > 0}
-      ({pretty_num((100 * value) / total)}%)
+      ({format_num((100 * value) / total)}%)
     {/if}
   {/if}
 </strong>

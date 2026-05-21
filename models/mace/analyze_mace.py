@@ -9,8 +9,8 @@ from pymatviz.enums import Key
 
 from matbench_discovery import SITE_FIGS
 from matbench_discovery import plots as plots
-from matbench_discovery.data import Model, df_wbm
-from matbench_discovery.enums import MbdKey
+from matbench_discovery.data import df_wbm
+from matbench_discovery.enums import MbdKey, Model
 
 __author__ = "Janosh Riebesell"
 __date__ = "2023-07-23"
@@ -20,24 +20,26 @@ e_form_mace_col = "e_form_per_atom_mace"
 
 
 # %%
-df_mace = pd.read_csv(Model.mace.path).set_index(Key.mat_id)
+df_mace = pd.read_csv(Model.mace_mp_0.discovery_path).set_index(Key.mat_id)
 df_mace[list(df_wbm)] = df_wbm
 
-df_mace[Key.spg_num] = df_wbm[MbdKey.init_wyckoff].str.split("_").str[2].astype(int)
+df_mace[Key.spg_num] = (
+    df_wbm[MbdKey.init_protostructure_spglib].str.split("_").str[2].astype(int)
+)
 
 
 # %%
-ax = pmv.density_scatter(df=df_mace, x=MbdKey.e_form_dft, y=e_form_mace_col)
-ax.set(title=f"{len(df_mace):,} MACE severe energy underpredictions")
-pmv.save_fig(ax, "mace-hull-dist-scatter.pdf")
+fig = pmv.density_scatter(df=df_mace, x=MbdKey.e_form_dft, y=e_form_mace_col)
+fig.layout.title = f"{len(df_mace):,} MACE severe energy underpredictions"
+pmv.save_fig(fig, "mace-hull-dist-scatter.pdf")
 
 
 # %%
 df_low = df_mace.query(f"{MbdKey.e_form_dft} - {e_form_mace_col} > 2")
 
-ax = pmv.density_scatter(df=df_low, x=MbdKey.e_form_dft, y=e_form_mace_col)
-ax.set(title=f"{len(df_low):,} MACE severe energy underpredictions")
-pmv.save_fig(ax, "mace-too-low-hull-dist-scatter.pdf")
+fig = pmv.density_scatter(df=df_low, x=MbdKey.e_form_dft, y=e_form_mace_col)
+fig.layout.title = f"{len(df_low):,} MACE severe energy underpredictions"
+pmv.save_fig(fig, "mace-too-low-hull-dist-scatter.pdf")
 
 
 # %%
@@ -67,8 +69,8 @@ Lanthanide and heavy alkali metals.
 bad_mask = (df_mace[e_form_mace_col] - df_mace[MbdKey.e_form_dft]) < -5
 print(f"{sum(bad_mask)=}")
 
-fig = pmv.density_scatter_plotly(
-    df_mace[~bad_mask],
+fig = pmv.density_scatter(
+    df=df_mace[~bad_mask],
     x=MbdKey.e_form_dft,
     y=e_form_mace_col,
     log_density=(log := True),
@@ -79,8 +81,8 @@ pmv.save_fig(fig, f"{SITE_FIGS}/mace-wbm-IS2RE-e-form-parity.svelte")
 
 
 # %%
-fig = pmv.density_scatter_plotly(
-    df_mace[~bad_mask], x="uncorrected_energy", y="mace_energy", log_density=log
+fig = pmv.density_scatter(
+    df=df_mace[~bad_mask], x="uncorrected_energy", y="mace_energy", log_density=log
 )
 fig.layout.yaxis.title = "MACE energy"
 

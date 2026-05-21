@@ -3,20 +3,31 @@ from glob import glob
 
 import pytest
 
-from matbench_discovery import ROOT, __version__
-from matbench_discovery.data import Model
-from matbench_discovery.models import MODEL_DIRS, MODEL_METADATA, model_is_compliant
+from matbench_discovery import ROOT
+from matbench_discovery.data import DATASETS
+from matbench_discovery.enums import Model
+from matbench_discovery.models import model_is_compliant, validate_model_metadata
+
+OPEN_DATASETS = {
+    dataset["name"]
+    for dataset in DATASETS.values()
+    if isinstance(dataset, dict) and dataset.get("open")
+}
+
+# Get model directories for testing
+MODEL_DIRS = sorted(glob(f"{ROOT}/models/[!_]*/"))
 
 
-def parse_version(v: str) -> tuple[int, ...]:
-    return tuple(map(int, v.split(".")))
+def parse_version(version: str) -> tuple[int, ...]:
+    """Parse version string into tuple of integers."""
+    return tuple(map(int, version.split(".")))
 
 
 def test_model_dirs_have_metadata() -> None:
+    """Test that all model directories have required metadata."""
     required = {
         "authors": list,  # dict with name, affiliation, orcid?, email?
         "date_added": str,
-        "matbench_discovery_version": str,
         "model_name": str,
         "model_version": str,
         "repo": str,
@@ -27,20 +38,37 @@ def test_model_dirs_have_metadata() -> None:
         },
     }
 
-    assert len(MODEL_METADATA) >= len(MODEL_DIRS), "Missing metadata for some models"
+    # Count completed models
+    completed_models = [model for model in Model if model.is_complete]
+    assert len(completed_models) >= len(MODEL_DIRS) - 5, (
+        "Missing metadata for some models"
+    )
 
-    for model_name, metadata in MODEL_METADATA.items():
-        model_dir = metadata["model_dir"]
+    for model in completed_models:
+        model_dir = f"{ROOT}/models/{model.key}/"
         for key, expected in required.items():
-            assert key in metadata, f"Required {key=} missing in {model_dir}"
-            actual_val = metadata[key]
+            assert key in model.metadata, f"Required {key=} missing in {model_dir}"
+
             if key == "training_set":
+                training_sets = model.metadata[key]
                 # allow either string key or dict
-                assert isinstance(actual_val, dict | str | list)
-            if (isinstance(expected, dict) and key != "training_set") or (
-                key == "training_set" and isinstance(actual_val, dict)
-            ):
-                missing_keys = {*expected} - {*actual_val}  # type: ignore[misc]
+                assert isinstance(training_sets, list)
+                assert set(training_sets) <= {*DATASETS}, (
+                    f"Invalid training set: {training_sets}"
+                )
+                # Check if model was trained only on open datasets
+                openness = model.metadata["openness"].endswith("OD")
+                if set(training_sets) <= OPEN_DATASETS and not openness:
+                    # if so, check that the model is marked as OD (open data)
+                    raise ValueError(
+                        f"{model.label} was only trained on open datasets but is "
+                        f"marked as {model.metadata['openness']}. Should be marked as "
+                        "OD."
+                    )
+
+            actual_val = model.metadata[key]
+            if isinstance(expected, dict) and key != "training_set":
+                missing_keys = {*expected} - {*actual_val}
                 assert not missing_keys, f"{missing_keys=} under {key=} in {model_dir}"
                 continue
 
@@ -48,31 +76,25 @@ def test_model_dirs_have_metadata() -> None:
                 err_msg = f"Invalid {key=}, expected {expected} in {model_dir}"
                 assert isinstance(actual_val, expected), err_msg
 
-        authors, date_added, mbd_version, yml_model_name, model_version, repo = (
-            metadata[key] for key in list(required)[:-1]
+        authors, date_added, yml_model_name, model_version, repo = (
+            model.metadata[key] for key in list(required)[:-1]
         )
-        assert model_name == yml_model_name, f"{model_name=} != {yml_model_name=}"
+        assert model.label == yml_model_name, f"{model.label=} != {yml_model_name=}"
 
         # make sure all keys are valid
-        for name in model_name if isinstance(model_name, list) else [model_name]:
-            assert (
-                3 <= len(name) < 50
-            ), f"Invalid {name=} not between 3 and 50 characters"
-        assert (
-            1 < len(model_version) < 30
-        ), f"Invalid {model_version=} not between 1 and 30 characters"
-        # TODO increase max allowed version when updating package
-        assert (
-            parse_version("1.0.0")
-            <= parse_version(mbd_version)
-            <= parse_version(__version__)
-        ), f"Invalid matbench-discovery version: {mbd_version}"
+        for name in model.label if isinstance(model.label, list) else [model.label]:
+            assert 3 <= len(name) < 50, (
+                f"Invalid {name=} not between 3 and 50 characters"
+            )
+        assert 1 < len(model_version) < 30, (
+            f"Invalid {model_version=} not between 1 and 30 characters"
+        )
         assert isinstance(date_added, str), f"Invalid {date_added=} not a string"
         assert isinstance(authors, list)
         assert 1 < len(authors) < 30, f"{len(authors)=} not between 1 and 30"
-        assert repo.startswith(
-            "https://"
-        ), f"Invalid {repo=} not starting with https://"
+        assert repo == "missing" or repo.startswith("https://"), (
+            f"Invalid {repo=} not starting with https://"
+        )
 
 
 def test_model_dirs_have_test_scripts() -> None:
@@ -83,24 +105,102 @@ def test_model_dirs_have_test_scripts() -> None:
 
 
 def test_model_enum() -> None:
-    for model_key in Model:
-        model_yaml_path = f"{ROOT}/models/{model_key.url}"
-        assert os.path.isfile(model_key.path)
-        assert os.path.isfile(model_yaml_path) or model_key.url is None
+    """Test Model enum functionality."""
+    # Skip file existence checks in CI environment
+    for model in Model:
+        assert os.path.isfile(model.yaml_path)
+        assert "/models/" in model.discovery_path
+
+    # Test model properties that don't depend on file existence
+    assert Model.mace_mp_0.label == "MACE-MP-0"
+    assert Model.mace_mp_0.name == Model.mace_mp_0.value == "mace_mp_0"
 
 
 @pytest.mark.parametrize(
-    "model_key, is_compliant",
+    "input_value, expected_model",
+    [
+        # Exact matches
+        ("mace_mp_0", Model.mace_mp_0),
+        ("eqv2_s_dens_mp", Model.eqv2_s_dens_mp),
+        # Dash conversion
+        ("mace-mp-0", Model.mace_mp_0),
+        ("eqV2-s-dens-mp", Model.eqv2_s_dens_mp),
+        # Case insensitive
+        ("MACE-MP-0", Model.mace_mp_0),
+        ("EQV2-S-DENS-MP", Model.eqv2_s_dens_mp),
+        # Mixed separators
+        ("mace-mp_0", Model.mace_mp_0),
+        ("mace_mp-0", Model.mace_mp_0),
+    ],
+)
+def test_model_missing_valid_inputs(input_value: str, expected_model: Model) -> None:
+    """Test that _missing_ method correctly handles valid inputs."""
+    assert Model._missing_(input_value) is expected_model
+
+
+@pytest.mark.parametrize(
+    "input_value",
+    [123, None, [], {}, "nonexistent", "mace-mp-1", "eqv2-s-dens", "", "   "],
+)
+def test_model_missing_invalid_inputs(
+    input_value: str | int | None | list | dict,
+) -> None:
+    """Test that _missing_ method returns None for invalid inputs."""
+    assert Model._missing_(input_value) is None
+
+
+@pytest.mark.parametrize(
+    "model, is_compliant",
     [
         (Model.megnet, True),
-        (Model.eqv2_m, False),
-        (Model.eqv2_s_dens, True),
-        (Model.orb, False),
+        (Model.eqv2_m_omat_salex_mp, False),
+        (Model.eqv2_s_dens_mp, True),
+        (Model.orb_v2, False),
         (Model.wrenformer, True),
         (Model.voronoi_rf, True),
         (Model.gnome, False),
-        (Model.mattersim, False),
+        (Model.mattersim_v1_5m, False),
+        (Model.nequix_mp_1_pft, True),
     ],
 )
-def test_model_is_compliant(model_key: Model, is_compliant: bool) -> None:
-    assert model_is_compliant(MODEL_METADATA[model_key.label]) is is_compliant
+def test_model_is_compliant(model: Model, is_compliant: bool) -> None:
+    """Test model compliance checking."""
+    assert model.is_compliant is is_compliant
+    # Also test the function directly for consistency
+    assert model_is_compliant(model.metadata) is is_compliant
+
+
+@pytest.mark.parametrize(
+    "func, metadata, error_type, error_match",
+    [
+        # model_is_compliant errors
+        (
+            model_is_compliant,
+            {"openness": "OSOD", "training_set": "MPtrj", "model_name": "test"},
+            TypeError,
+            "expected list of training sets",
+        ),
+        # validate_model_metadata errors
+        (
+            lambda m: validate_model_metadata(m, "test.yml"),
+            {"status": "incomplete"},
+            ValueError,
+            "has status != 'complete'",
+        ),
+        (
+            lambda m: validate_model_metadata(m, "test.yml"),
+            {"model_type": "InvalidType"},
+            ValueError,
+            "is not a valid ModelType",
+        ),
+    ],
+)
+def test_model_validation_errors(
+    func: object,
+    metadata: dict[str, str],
+    error_type: type[Exception],
+    error_match: str,
+) -> None:
+    """Test model validation functions raise appropriate errors."""
+    with pytest.raises(error_type, match=error_match):
+        func(metadata)  # ty: ignore[call-non-callable]

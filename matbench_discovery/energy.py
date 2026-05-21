@@ -14,7 +14,7 @@ from pymatgen.entries.computed_entries import ComputedEntry
 from pymatgen.util.typing import EntryLike
 from tqdm import tqdm
 
-from matbench_discovery.data import DataFiles
+from matbench_discovery.enums import DataFiles
 
 
 def get_elemental_ref_entries(
@@ -76,9 +76,9 @@ mp_elem_ref_entries = (
 )
 
 # tested to agree with TRI's MP reference energies
-# https://github.com/TRI-AMDD/CAMD/blob/1c965cba636531e542f4821a555b98b2d81ed034/camd/utils/data.py#L134
+# https://github.com/TRI-AMDD/CAMD/blob/1c965cba636/camd/utils/data.py#L134
 mp_elemental_ref_energies = {
-    elem: round(entry.energy_per_atom, 4) for elem, entry in mp_elem_ref_entries.items()
+    elem: entry.energy_per_atom for elem, entry in mp_elem_ref_entries.items()
 }
 
 
@@ -112,7 +112,7 @@ def calc_energy_from_e_refs(
         ValueError: If missing reference energies for some elements
     """
     if isinstance(struct_or_entry, dict):  # entry dict case
-        energy = struct_or_entry["energy"]
+        energy: float = struct_or_entry["energy"]
         comp = Composition(struct_or_entry["composition"])
     # Entry/ComputedEntry/ComputedStructureEntry instance case
     elif isinstance(struct_or_entry, Entry):
@@ -175,7 +175,7 @@ def get_e_form_per_atom(*args: Any, **kwargs: Any) -> float:  # noqa: D417
         ref_energies = args[1]
         args = (args[0], *args[2:])
     else:
-        if entry := kwargs.pop("entry"):
+        if entry := kwargs.pop("entry", None):
             args = (entry, *args)
         ref_energies = kwargs.pop("elemental_ref_energies", mp_elemental_ref_energies)
     kwargs.setdefault("ref_energies", ref_energies)

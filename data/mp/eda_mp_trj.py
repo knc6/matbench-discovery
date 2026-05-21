@@ -3,27 +3,22 @@
 # %%
 import os
 from collections import defaultdict
-from typing import Any
 
 import ase
 import ase.io.extxyz
-import matplotlib.colorbar
-import matplotlib.colors
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import pymatviz as pmv
-from matplotlib.colors import SymLogNorm
 from pymatgen.core import Composition
 from pymatgen.core.tensors import Tensor
-from pymatviz.enums import Key
+from pymatviz.enums import ElemCountMode, Key
 from tqdm import tqdm
 
 from matbench_discovery import MP_DIR, PDF_FIGS, ROOT, SITE_FIGS
-from matbench_discovery.data import DataFiles, ase_atoms_from_zip, df_wbm
+from matbench_discovery.data import ase_atoms_from_zip, df_wbm
 from matbench_discovery.energy import get_e_form_per_atom
-from matbench_discovery.enums import MbdKey
+from matbench_discovery.enums import DataFiles, MbdKey
 
 __author__ = "Janosh Riebesell"
 __date__ = "2023-11-22"
@@ -56,7 +51,7 @@ atoms_list = ase_atoms_from_zip(DataFiles.mp_trj_extxyz.path)
 
 mp_trj_atoms: dict[str, list[ase.Atoms]] = defaultdict(list)
 for atoms in atoms_list:
-    mp_id = atoms.info.get(Key.mat_id, "no-id")
+    mp_id = atoms.info[Key.mat_id]
     assert mp_id.startswith(("mp-", "mvc-"))
     mp_trj_atoms[mp_id].append(atoms)
 
@@ -111,14 +106,6 @@ df_mp_trj[Key.stress_trace] = [
 df_mp_trj.to_json(mp_trj_summary_path)
 
 
-# %%
-def tile_count_anno(hist_vals: list[Any]) -> dict[str, Any]:
-    """Annotate each periodic table tile with the number of values in its histogram."""
-    face_color = cmap(norm(np.sum(len(hist_vals)))) if hist_vals else "none"
-    bbox = dict(facecolor=face_color, alpha=0.4, pad=2, edgecolor="none")
-    return dict(text=pmv.si_fmt(len(hist_vals), ".0f"), bbox=bbox)
-
-
 # %% plot per-element magmom histograms
 ptable_magmom_hist_path = f"{MP_DIR}/2022-09-16-mp-trj-elem-magmoms.json.bz2"
 srs_mp_trj_elem_magmoms = locals().get("srs_mp_trj_elem_magmoms")
@@ -141,25 +128,19 @@ if srs_mp_trj_elem_magmoms is None:
     }
     pd.Series(srs_mp_trj_elem_magmoms).to_json(ptable_magmom_hist_path)
 
-cmap = plt.get_cmap(color_map := "viridis")
-norm = matplotlib.colors.LogNorm(vmin=1, vmax=150_000)
 
-fig_ptable_magmoms = pmv.ptable_hists(
+fig_ptable_magmoms = pmv.ptable_hists_plotly(
     srs_mp_trj_elem_magmoms,
-    symbol_pos=(0.2, 0.8),
     log=True,
-    cbar_title="Magmoms ($μ_B$)",
-    cbar_title_kwargs=dict(fontsize=16),
-    cbar_coords=(0.18, 0.85, 0.42, 0.02),
-    # annotate each element with its number of magmoms in MPtrj
-    # anno_kwds=tile_count_anno,
-    colormap=color_map,
+    bins=100,
+    x_range=(-2, 2),
+    colorbar=dict(title="Magmoms (μ<sub>B</sub>)"),
+    annotations=lambda hist_vals: dict(text=pmv.si_fmt(len(hist_vals), fmt=".0f")),
+    colorscale="Viridis",
+    x_axis_kwargs=dict(nticks=3, tickformat=".0f"),
 )
+fig_ptable_magmoms.show()
 
-cbar_ax = fig_ptable_magmoms.figure.add_axes([0.26, 0.78, 0.25, 0.015])
-cbar = matplotlib.colorbar.ColorbarBase(
-    cbar_ax, cmap=cmap, norm=norm, orientation="horizontal"
-)
 pmv.save_fig(fig_ptable_magmoms, f"{PDF_FIGS}/mp-trj-magmoms-ptable-hists.pdf")
 
 
@@ -184,26 +165,18 @@ if srs_mp_trj_elem_forces is None:
     srs_mp_trj_elem_forces = pd.Series(mp_trj_elem_forces)
     srs_mp_trj_elem_forces.to_json(ptable_force_hist_path)
 
-cmap = plt.get_cmap(color_map := "viridis")
-norm = matplotlib.colors.LogNorm(vmin=1, vmax=1_000_000)
 
 max_force = 10  # eV/Å
-fig_ptable_forces = pmv.ptable_hists(
+fig_ptable_forces = pmv.ptable_hists_plotly(
     srs_mp_trj_elem_forces.copy().map(lambda x: [val for val in x if val < max_force]),
-    symbol_pos=(0.3, 0.8),
     log=True,
-    cbar_title="1/3 Σ|Forces| (eV/Å)",
-    cbar_title_kwargs=dict(fontsize=16),
-    cbar_coords=(0.18, 0.85, 0.42, 0.02),
+    colorbar=dict(title="1/3 Σ|Forces| (eV/Å)"),
+    annotations=lambda hist_vals: dict(text=pmv.si_fmt(len(hist_vals), fmt=".0f")),
+    colorscale="Viridis",
+    x_axis_kwargs=dict(nticks=3, tickformat=".0f"),
     x_range=(0, max_force),
-    # anno_kwds=tile_count_anno,
-    colormap=color_map,
 )
-
-cbar_ax = fig_ptable_forces.figure.add_axes([0.26, 0.78, 0.25, 0.015])
-cbar = matplotlib.colorbar.ColorbarBase(
-    cbar_ax, cmap=cmap, norm=norm, orientation="horizontal"
-)
+fig_ptable_forces.show()
 
 pmv.save_fig(fig_ptable_forces, f"{PDF_FIGS}/mp-trj-forces-ptable-hists.pdf")
 
@@ -233,48 +206,28 @@ elif srs_mp_trj_elem_n_sites is None:
     srs_mp_trj_elem_n_sites.to_json(ptable_n_sites_hist_path)
 
 
-cmap = plt.get_cmap("Blues")
-cbar_ticks = (100, 1_000, 10_000, 100_000, 1_000_000)
-norm = matplotlib.colors.LogNorm(vmin=min(cbar_ticks), vmax=max(cbar_ticks))
-
-fig_ptable_sites = pmv.ptable_hists(
+fig_ptable_sites = pmv.ptable_hists_plotly(
     srs_mp_trj_elem_n_sites,
-    symbol_pos=(0.8, 0.9),
     log=True,
-    cbar_title="Number of Sites",
-    cbar_title_kwargs=dict(fontsize=16),
-    cbar_coords=(0.18, 0.85, 0.42, 0.02),
-    # anno_kwds=lambda hist_vals: dict(
-    #     text=pmv.si_fmt(len(hist_vals), ".0f"),
-    #     xy=(0.8, 0.6),
-    #     bbox=dict(pad=2, edgecolor="none", facecolor="none"),
-    # ),
+    symbol_kwargs=dict(x=0.5, y=1.1, xanchor="center"),
+    colorbar=dict(title="Number of Sites"),
+    annotations=lambda hist_vals: dict(
+        text=pmv.si_fmt(len(hist_vals), fmt=".0f"), x=1, y=0.6, xanchor="right"
+    ),
     x_range=(1, 300),
-    # hist_kwds=lambda hist_vals: dict(
-    #     color=cmap(norm(len(hist_vals))), edgecolor="none"
-    # ),
+    colorscale="Viridis",
+    x_axis_kwargs=dict(nticks=2, tickformat=".0f"),
 )
-
-# turn off y axis for helium (why is it even there?)
-fig_ptable_sites.axes[17].get_yaxis().set_visible(b=False)
-
-cbar_ax = fig_ptable_sites.figure.add_axes([0.23, 0.73, 0.31, 0.025])
-cbar = matplotlib.colorbar.ColorbarBase(
-    cbar_ax,
-    cmap=cmap,
-    norm=norm,
-    orientation="horizontal",
-    ticks=cbar_ticks,
-)
-cbar.set_label("Number of atoms in MPtrj structures", fontsize=16)
-cbar.ax.xaxis.set_label_position("top")
-
+fig_ptable_sites.show()
+for anno in fig_ptable_sites.layout.annotations:
+    # change text color to black for PDF
+    anno.font.color = "black"
 pmv.save_fig(fig_ptable_sites, f"{PDF_FIGS}/mp-trj-n-sites-ptable-hists.pdf")
 
 
 # %%
-elem_counts: dict[str, dict[str, int]] = {}
-for count_mode in ("composition", "occurrence"):
+elem_counts: dict[ElemCountMode, pd.Series[int]] = {}
+for count_mode in (ElemCountMode.composition, ElemCountMode.occurrence):
     trj_elem_counts = pmv.count_elements(df_mp_trj[Key.formula], count_mode=count_mode)
     elem_counts[count_mode] = trj_elem_counts
     filename = f"mp-trj-element-counts-by-{count_mode}"
@@ -287,48 +240,45 @@ trj_elem_counts = pd.read_json(
     f"{data_page}/mp-trj-element-counts-by-{count_mode}.json", typ="series"
 )
 
-excl_elems = "He Ne Ar Kr Xe".split() if (excl_noble := False) else ()
+excl_elems = ("He", "Ne", "Ar", "Kr", "Xe") if (excl_noble := False) else ()
 
-ax_ptable = pmv.ptable_heatmap(  # matplotlib version looks better for SI
+fig = pmv.ptable_heatmap_plotly(
     trj_elem_counts,
-    # zero_color="#efefef",
-    log=(log := SymLogNorm(linthresh=10_000)),
     exclude_elements=excl_elems,  # drop noble gases
-    # cbar_range=None if excl_noble else (10_000, None),
-    show_values=(show_vals := True),
-    # label_font_size=17 if show_vals else 25,
-    # value_font_size=14,
-    cbar_title="MPtrj Element Counts",
+    log=(log := True),
+    colorbar=dict(title="MPtrj Element Counts"),
 )
 
 img_name = f"mp-trj-element-counts-by-{count_mode}"
-if log:
-    img_name += "-symlog" if isinstance(log, SymLogNorm) else "-log"
 if excl_noble:
     img_name += "-excl-noble"
-pmv.save_fig(ax_ptable, f"{PDF_FIGS}/{img_name}.pdf")
+if log:
+    img_name += "-log"
+pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf")
+fig.show()
 
 
 # %%
 normalized = True
-ax_ptable = pmv.ptable_heatmap_ratio(
-    trj_elem_counts / (len(df_mp_trj) if normalized else 1),
-    mp_occu_counts / (len(df_mp) if normalized else 1),
-    zero_color="#efefef",
-    fmt=".2f",
-    not_in_denominator=None,
-    not_in_numerator=None,
-    not_in_either=None,
+fig = pmv.ptable_heatmap_plotly(
+    {
+        elem: (trj_count / 1_580_395) / (mp_count / len(df_mp))
+        for elem, trj_count in trj_elem_counts.items()
+        if elem in mp_occu_counts
+        for mp_count in [mp_occu_counts[elem]]  # clever way to get mp_count in scope
+    },
+    colorbar=dict(title="MPtrj/MP Element Count Ratio"),
 )
 
 img_name = "mp-trj-mp-ratio-element-counts-by-occurrence"
 if normalized:
     img_name += "-normalized"
-pmv.save_fig(ax_ptable, f"{PDF_FIGS}/{img_name}.pdf")
+pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf")
+fig.show()
 
 
 # %% plot formation energy per atom distribution
-# pdf_kwds defined to use the same figure size for all plots
+# pdf_kwargs defined to use the same figure size for all plots
 fig = pmv.histogram(df_mp_trj[MbdKey.e_form_dft], bins=300, opacity=1)
 if log := False:
     fig.update_yaxes(type="log")
@@ -337,9 +287,9 @@ count_col = "Number of Structures"
 fig.layout.yaxis.title = count_col
 fig.show()
 
-pdf_kwds = dict(width=500, height=300)
+pdf_kwargs = dict(width=500, height=300)
 # pmv.save_fig(
-#     fig, f"{PDF_FIGS}/mp-trj-e-form-hist{'-log' if log else ''}.pdf", **pdf_kwds
+#     fig, f"{PDF_FIGS}/mp-trj-e-form-hist{'-log' if log else ''}.pdf", **pdf_kwargs
 # )
 # pmv.save_fig(fig, f"{SITE_FIGS}/mp-trj-e-form-hist.svelte")
 
@@ -471,7 +421,7 @@ for x0, y0, x1, y1 in (
         xref="x3",
         yref="y3",
     )
-fig.layout.yaxis3.update(showgrid=False, rangemode="tozero")
+fig.update_layout(yaxis3=dict(showgrid=False, rangemode="tozero"))
 
 fig.layout.margin = dict(l=5, r=5, b=5, t=5)
 fig.layout.legend.update(x=0.96, y=0.18, xanchor="right", bgcolor="rgba(0,0,0,0)")

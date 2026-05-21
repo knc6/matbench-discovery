@@ -1,42 +1,16 @@
-"""Initializes global variable MODEL_METADATA."""
+"""Model utilities for matbench-discovery."""
 
-from glob import glob
 from typing import Any
 
-import yaml
-
-from matbench_discovery import ROOT
+from matbench_discovery.data import DATASETS
 from matbench_discovery.enums import ModelType, Open
 
-# ignore underscore-prefixed directories for WIP model submissions
-MODEL_DIRS = glob(f"{ROOT}/models/[!_]*/")
-MODEL_METADATA: dict[str, dict[str, Any]] = {}
-
-for model_dir in MODEL_DIRS:
-    metadata_files = glob(f"{model_dir}*.yml")
-    if not 1 <= len(metadata_files) <= 2:
-        raise RuntimeError(
-            f"expected 1 metadata file, got {metadata_files=} in {model_dir=}"
-        )
-    for metadata_file in metadata_files:
-        # make sure all required keys are non-empty
-        with open(metadata_file) as yml_file:
-            model_data = yaml.full_load(yml_file)
-
-        # skip models that aren't completed
-        if model_data.get("status", "complete") != "complete":
-            continue
-
-        model_data["model_dir"] = model_dir
-        # YAML file name serves as model key and must match Model enum attribute
-        model_data["model_key"] = metadata_file.split("/")[-1].split(".yml")[0]
-        MODEL_METADATA[model_data["model_name"]] = model_data
-
-        try:
-            ModelType(model_data.get("model_type"))  # check if model_type is valid
-        except ValueError as exc:
-            exc.add_note(f"{metadata_file=}")
-            raise
+# Compute compliant training sets from datasets.yml (datasets with compliant: true)
+COMPLIANT_TRAINING_SETS: frozenset[str] = frozenset(
+    key
+    for key, val in DATASETS.items()
+    if isinstance(val, dict) and val.get("compliant")
+)
 
 
 def model_is_compliant(metadata: dict[str, str | list[str]]) -> bool:
@@ -60,4 +34,24 @@ def model_is_compliant(metadata: dict[str, str | list[str]]) -> bool:
             f"{model_name}: expected list of training sets, got {training_sets=}"
         )
 
-    return set(training_sets) <= {"MP 2022", "MPtrj", "MPF", "MP Graphs"}
+    return set(training_sets) <= COMPLIANT_TRAINING_SETS
+
+
+def validate_model_metadata(metadata: dict[str, Any], metadata_file: str) -> None:
+    """Validate model metadata for required fields and types.
+
+    Args:
+        metadata: model metadata dictionary
+        metadata_file: path to metadata file for error reporting
+
+    Raises:
+        ValueError: if validation fails
+    """
+    if metadata.get("status", "complete") != "complete":  # skip incomplete models
+        raise ValueError(f"Model {metadata_file} has status != 'complete'")
+
+    try:  # check if model_type is valid
+        ModelType(metadata.get("model_type"))
+    except ValueError as exc:
+        exc.add_note(f"{metadata_file=}\nPick from {', '.join(ModelType)}")
+        raise

@@ -15,12 +15,12 @@ from pymatviz.enums import Key
 from tqdm import tqdm
 
 from matbench_discovery import ROOT, today
-from matbench_discovery.data import DataFiles
-from matbench_discovery.slurm import slurm_submit
+from matbench_discovery.enums import DataFiles
+from matbench_discovery.hpc import slurm_submit
 
 sys.path.append(f"{ROOT}/models")
 
-from voronoi_rf import featurizer
+from . import featurizer
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-10-31"
@@ -35,9 +35,9 @@ data_path = {
 
 input_col = Key.init_struct  # or Key.final_struct
 debug = "slurm-submit" in sys.argv
-job_name = f"voronoi-features-{data_name}"
+job_name = f"{today}-voronoi-features-{data_name}"
 module_dir = os.path.dirname(__file__)
-out_dir = os.getenv("SBATCH_OUTPUT", f"{module_dir}/{today}-{job_name}")
+out_dir = os.getenv("SBATCH_OUTPUT", f"{module_dir}/{job_name}")
 slurm_array_task_count = 50
 
 
@@ -52,22 +52,22 @@ slurm_vars = slurm_submit(
 
 
 # %%
-slurm_array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID", "0"))
+slurm_array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID", "1"))
 run_name = f"{job_name}-{slurm_array_task_id}"
 out_path = f"{out_dir}/{run_name}.csv.bz2"
 
 if os.path.isfile(out_path):
-    raise SystemExit(f"{out_path=} already exists, exciting early")
+    raise SystemExit(f"{out_path=} already exists, exiting early")
 
 print(f"{data_path=}")
-df_in = pd.read_json(data_path).set_index(Key.mat_id)
+df_in = pd.read_json(data_path, lines=True).set_index(Key.mat_id)
 if slurm_array_task_count > 1:
     df_in = np.array_split(df_in, slurm_array_task_count)[slurm_array_task_id - 1]
 
 if data_name == "mp":  # extract structure dicts from ComputedStructureEntry
     struct_dicts = [cse["structure"] for cse in df_in.entry]
 elif data_name == "wbm" and input_col == Key.final_struct:
-    struct_dicts = [cse["structure"] for cse in df_in[Key.cse]]
+    struct_dicts = [cse["structure"] for cse in df_in[Key.computed_structure_entry]]
 elif data_name == "wbm" and input_col == Key.init_struct:
     struct_dicts = df_in[Key.init_struct]
 else:

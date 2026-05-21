@@ -1,3 +1,5 @@
+"""Train a CGCNN ensemble on target_col of data_path."""
+
 # %%
 import os
 from importlib.metadata import version
@@ -13,13 +15,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 
 from matbench_discovery import WANDB_PATH, timestamp, today
-from matbench_discovery.data import DataFiles
-from matbench_discovery.slurm import slurm_submit
+from matbench_discovery.enums import DataFiles
+from matbench_discovery.hpc import slurm_submit
 from matbench_discovery.structure import perturb_structure
-
-"""
-Train a CGCNN ensemble on target_col of data_path.
-"""
 
 __author__ = "Janosh Riebesell"
 __date__ = "2022-06-13"
@@ -27,17 +25,17 @@ __date__ = "2022-06-13"
 
 # %%
 epochs = 300
-target_col = Key.form_energy
+target_col = Key.formation_energy_per_atom
 input_col = Key.structure
 # 0 for no perturbation, n>1 means train on n perturbations of each crystal
 # in the training set all assigned the same original target energy
 n_perturb = 0
-job_name = f"train-cgcnn-robust-{n_perturb=}"
+job_name = f"{today}-train-cgcnn-robust-{n_perturb=}"
 print(f"{job_name=}")
 robust = "robust" in job_name.lower()
 ensemble_size = 10
 module_dir = os.path.dirname(__file__)
-out_dir = os.getenv("SBATCH_OUTPUT", f"{module_dir}/{today}-{job_name}")
+out_dir = os.getenv("SBATCH_OUTPUT", f"{module_dir}/{job_name}")
 
 slurm_vars = slurm_submit(
     job_name=job_name,
@@ -54,7 +52,7 @@ optimizer = "AdamW"
 learning_rate = 3e-4
 batch_size = 128
 swa_start = None
-slurm_array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID", "0"))
+slurm_array_task_id = int(os.getenv("SLURM_ARRAY_TASK_ID", "1"))
 task_type: TaskType = "regression"
 
 
@@ -62,10 +60,12 @@ task_type: TaskType = "regression"
 data_path = DataFiles.mp_energies.path
 df_in = pd.read_csv(data_path).set_index(Key.mat_id)
 
-df_cse = pd.read_json(DataFiles.mp_computed_structure_entries.path).set_index(
+df_mp_cse = pd.read_json(DataFiles.mp_computed_structure_entries.path).set_index(
     Key.mat_id
 )
-df_in[input_col] = [Structure.from_dict(cse[input_col]) for cse in tqdm(df_cse.entry)]
+df_in[input_col] = [
+    Structure.from_dict(cse[input_col]) for cse in tqdm(df_mp_cse.entry)
+]
 
 if target_col not in df_in:
     raise TypeError(f"{target_col!s} not in {df_in.columns=}")
@@ -95,7 +95,7 @@ test_loader = DataLoader(
 )
 
 # 1 for regression, n_classes for classification
-n_targets = [1 if task_type == "regression" else df_in[target_col].max() + 1]
+n_targets = [1 if task_type == "regression" else int(df_in[target_col].max()) + 1]
 
 model_params = dict(
     n_targets=n_targets,

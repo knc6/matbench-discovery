@@ -1,50 +1,64 @@
 <script lang="ts">
-  import per_elem_each_errors from '$figs/per-element-each-errors.json'
-  import { PtableInset } from '$lib'
-  import type { ChemicalElement } from 'elementari'
-  import { ColorBar, ColorScaleSelect, PeriodicTable, TableInset } from 'elementari'
+  import { MODELS, PtableInset } from '$lib'
+  import type { ChemicalElement } from 'matterviz'
+  import { ColorBar, PeriodicTable, TableInset } from 'matterviz'
+  import type { D3InterpolateName } from 'matterviz/colors'
+  import type { ComponentProps } from 'svelte'
   import Select from 'svelte-multiselect'
+  import per_elem_each_errors from '../per-element-each-errors.json'
 
-  export let color_scale: string[] = [`Viridis`]
-  export let active_element: ChemicalElement | null = null
-  export let models: string[] = Object.keys(per_elem_each_errors)
-  // must be string[] instead of string for svelte-multiselect to be correctly restored by snapshot
-  export let current_model: string[] = [models[2]]
-  export let manual_cbar_max: boolean = false
-  export let normalized: boolean = true
-  export let cbar_max: number | null = 0.3
+  let {
+    color_scale = $bindable(`interpolateViridis`),
+    active_element = $bindable(null),
+    models = $bindable(MODELS.map((m) => m.model_name)),
+    current_model = $bindable([models[2]]),
+    manual_cbar_max = $bindable(false),
+    normalized = $bindable(true),
+    cbar_max = $bindable(0.3),
+    ...rest
+  }: ComponentProps<typeof PeriodicTable> & {
+    color_scale?: D3InterpolateName | ((num: number) => string)
+    active_element?: ChemicalElement | null
+    models?: string[]
+    // Must be string[] instead of string for svelte-multiselect to be correctly restored by snapshot
+    current_model?: string[]
+    manual_cbar_max?: boolean
+    normalized?: boolean
+    cbar_max?: number | null
+  } = $props()
 
   const test_set_std_key = `Test set standard deviation`
-
-  // remove test_set_std_key from models
-  $: models = models.filter((model) => model !== test_set_std_key)
-
   const test_set_std = per_elem_each_errors[test_set_std_key]
 
-  $: heatmap_values = Object.entries(per_elem_each_errors[current_model[0]]).map(
-    ([key, val]) => {
-      const denom = normalized ? test_set_std[key] : 1
-      if (denom) return val / denom
-      return null
-    },
+  let model_errors = $derived(
+    per_elem_each_errors[current_model[0] as keyof typeof per_elem_each_errors],
   )
-  $: current_data_max = Math.max(...heatmap_values)
-  $: cs_range = [0, manual_cbar_max ? cbar_max : current_data_max]
-
-  export const snapshot = {
-    capture: () => ({
-      color_scale,
-      current_model,
-      cbar_max,
-      manual_cbar_max,
-      normalized,
+  let heatmap_values = $derived(
+    Object.keys(model_errors).map((key) => {
+      const val = model_errors[key as keyof typeof model_errors]
+      const denom = normalized ? test_set_std[key as keyof typeof test_set_std] : 1
+      return denom ? (val ?? 0) / denom : 0
     }),
-    restore: (values) =>
-      ({ color_scale, current_model, cbar_max, manual_cbar_max, normalized } = values),
+  )
+  let current_data_max = $derived(Math.max(...heatmap_values))
+  let cs_range = $derived<[number, number]>([
+    0,
+    manual_cbar_max ? (cbar_max ?? 0) : current_data_max,
+  ])
+
+  const snapshot_data = () => (
+    { color_scale, current_model, cbar_max, manual_cbar_max, normalized }
+  )
+  export const snapshot = {
+    capture: snapshot_data,
+    restore: (
+      values: ReturnType<typeof snapshot_data>,
+    ) => ({ color_scale, current_model, cbar_max, manual_cbar_max, normalized } =
+      values),
   }
 </script>
 
-<p style="max-width: 45em; margin: auto;">
+<p>
   This periodic table heatmap shows the MAE of model-predicted convex hull distance
   projected onto each element. The errors for every structure in the test set are
   projected onto the fraction of each element in the composition and averaged over all
@@ -53,8 +67,6 @@
 </p>
 
 <Select bind:selected={current_model} options={models} maxSelect={1} minSelect={1} />
-
-<ColorScaleSelect bind:selected={color_scale} />
 
 <form>
   <label>
@@ -71,9 +83,9 @@
     {cbar_max}
   </label>
   <label>
+    <input type="checkbox" bind:checked={normalized} />
     Divide each element value by its std. dev. of target energies over all test structures
     containing a given element
-    <input type="checkbox" bind:checked={normalized} />
   </label>
   <small>
     This is meant to correct for the fact that some elements are inherently more difficult
@@ -83,28 +95,34 @@
 
 <PeriodicTable
   {heatmap_values}
-  color_scale={color_scale[0]}
+  {color_scale}
   bind:active_element
   color_scale_range={cs_range}
-  tile_props={{ precision: `0.2` }}
+  tile_props={{ float_fmt: `.2` }}
   show_photo={false}
+  missing_color="rgba(255,255,255,0.3)"
+  {...rest}
 >
-  <TableInset slot="inset" style="align-content: center;">
-    <PtableInset
-      element={active_element}
-      elem_counts={heatmap_values}
-      show_percent={false}
-      unit="<small style='font-weight: lighter;'>eV / atom</small>"
-    />
-    <ColorBar
-      text="{current_model[0]} ({normalized ? `normalized` : `eV/atom`})"
-      text_side="top"
-      color_scale={color_scale[0]}
-      tick_labels={5}
-      range={cs_range}
-      style="width: 85%; margin: 0 2em;"
-    />
-  </TableInset>
+  {#snippet inset()}
+    {#if active_element}
+      <TableInset style="align-content: center">
+        <PtableInset
+          element={active_element}
+          elem_counts={heatmap_values}
+          show_percent={false}
+          unit="<small style='font-weight: lighter;'>eV / atom</small>"
+        />
+        <ColorBar
+          title="{current_model[0]} ({normalized ? `normalized` : `eV/atom`})"
+          title_side="top"
+          {color_scale}
+          tick_labels={5}
+          range={cs_range}
+          style="width: 85%; margin: 0 2em"
+        />
+      </TableInset>
+    {/if}
+  {/snippet}
 </PeriodicTable>
 
 <style>

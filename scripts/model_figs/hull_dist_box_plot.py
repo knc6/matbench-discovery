@@ -2,12 +2,12 @@
 import plotly.express as px
 import plotly.graph_objects as go
 import pymatviz as pmv
-import seaborn as sns
-from pymatviz.enums import Key
 
 from matbench_discovery import PDF_FIGS, SITE_FIGS
-from matbench_discovery.enums import Quantity, TestSubset
-from matbench_discovery.preds import df_each_err, df_preds, models
+from matbench_discovery.cli import cli_args
+from matbench_discovery.enums import MbdKey, TestSubset
+from matbench_discovery.metrics.discovery import dfs_metrics
+from matbench_discovery.preds.discovery import df_each_err, df_preds
 
 __author__ = "Janosh Riebesell"
 __date__ = "2023-05-25"
@@ -16,92 +16,71 @@ __date__ = "2023-05-25"
 test_subset = globals().get("test_subset", TestSubset.uniq_protos)
 
 if test_subset == TestSubset.uniq_protos:
-    df_preds = df_preds.query(Key.uniq_proto)
+    df_preds = df_preds.query(MbdKey.uniq_proto)
     df_each_err = df_each_err.loc[df_preds.index]
 
 
 # %%
-ax = df_each_err[models].plot.box(
-    showfliers=False,
-    rot=90,
-    figsize=(12, 6),
-    # color="blue",
-    # different fill colors for each box
-    # patch_artist=True,
-    # notch=True,
-    # bootstrap=10_000,
-    showmeans=True,
-    # meanline=True,
+show_non_compliant = globals().get("show_non_compliant", False)
+models_to_plot = [
+    model
+    for model in cli_args.models
+    if model.is_complete and (show_non_compliant or model.is_compliant)
+]
+models_to_plot = sorted(
+    models_to_plot,
+    key=lambda model: dfs_metrics[test_subset][model.label][pmv.enums.Key.mae.symbol],
 )
-ax.axhline(0, linewidth=1, color="gray", linestyle="--")
-
-
-# %%
-ax = sns.violinplot(
-    data=df_each_err[models], inner="quartile", linewidth=0.3, palette="Set2", width=1
-)
-ax.set(ylim=(-0.9, 0.9))
-
-for idx, label in enumerate(ax.get_xticklabels()):
-    label.set_va("bottom" if idx % 2 else "top")
-    # lower all labels
-    label.set_y(label.get_position()[1] - 0.05)
-
-
-# %% take only 1_000 samples for speed (should not be used only for inspection)
-px.violin(
-    df_each_err[models].sample(1_000).melt(),
-    x="variable",
-    y="value",
-    color="variable",
-    violinmode="overlay",
-    box=True,
-    # points="all",
-    hover_data={"variable": False},
-    width=1000,
-    height=500,
-)
-
-
-# %%
 fig = go.Figure()
-fig.layout.yaxis.title = Quantity.e_above_hull_error
+fig.layout.yaxis.title = MbdKey.e_above_hull_error
 fig.layout.margin = dict(l=0, r=0, b=0, t=0)
 
-for idx, model in enumerate(models):
-    ys = [df_each_err[model].quantile(quant) for quant in (0.05, 0.25, 0.5, 0.75, 0.95)]
+# Get the default Plotly colors that will be used for the boxes
+color_seq = px.colors.qualitative.Plotly
 
-    fig.add_box(y=ys, name=model, width=0.7)
+for idx, model in enumerate(models_to_plot):
+    ys = [
+        df_each_err[model.label].quantile(quant)
+        for quant in (0.05, 0.25, 0.5, 0.75, 0.95)
+    ]
 
-    # Add an annotation for the interquartile range
-    IQR = ys[3] - ys[1]
+    # Use the same color for both box and label
+    color = color_seq[idx % len(color_seq)]
+    fig.add_box(
+        y=ys,
+        name=model.label,
+        width=0.8,
+        marker_color=color,
+        hoverinfo="y",
+    )
+
+    # annotate median with numeric value
     median = ys[2]
     fig.add_annotation(
-        x=idx, y=1, text=f"{IQR:.2}", showarrow=False, yref="paper", yshift=-10
+        x=idx, y=median, text=f"{median:.2}", showarrow=False, font_size=9
     )
-    fig.add_annotation(
-        x=idx,
-        y=median,
-        text=f"{median:.2}",
-        showarrow=False,
-        yshift=7,
-        # bgcolor="rgba(0, 0, 0, 0.2)",
-        # width=50,
-    )
-fig.add_annotation(x=-0.6, y=1, text="IQR", showarrow=False, yref="paper", yshift=-10)
 
-fig.layout.legend.update(orientation="h", y=1.2)
-# prevent x-labels from rotating
-fig.layout.xaxis.tickangle = 0
-# use line breaks to offset every other x-label
+fig.layout.showlegend = False
+# use line breaks to offset every other x-label and color them
 x_labels_with_offset = [
-    f"{'<br>' * (idx % 2)}{label}" for idx, label in enumerate(models)
+    f"<span style='color: {color_seq[idx % len(color_seq)]}'>{model.label}</span>"
+    for idx, model in enumerate(models_to_plot)
 ]
-fig.layout.xaxis.update(tickvals=models, ticktext=x_labels_with_offset)
+
+# prevent x-labels from rotating
+fig.layout.xaxis.range = [-0.7, len(models_to_plot) - 0.3]
+fig.layout.xaxis.update(
+    # tickangle=0,
+    tickvals=[*range(len(models_to_plot))],
+    ticktext=x_labels_with_offset,
+)
+fig.layout.yaxis.update(title=MbdKey.e_above_hull_error.label, tickformat=".3")
 fig.show()
 
 
 # %%
-pmv.save_fig(fig, f"{SITE_FIGS}/box-hull-dist-errors.svelte")
+img_suffix = "" if show_non_compliant else "-only-compliant"
+img_name = f"box-hull-dist-errors{img_suffix}"
+pmv.save_fig(fig, f"{SITE_FIGS}/{img_name}.svelte")
 fig.layout.showlegend = False
-pmv.save_fig(fig, f"{PDF_FIGS}/box-hull-dist-errors.pdf")
+pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf")

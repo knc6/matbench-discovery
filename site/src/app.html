@@ -2,6 +2,23 @@
 <html lang="en">
   <head>
     <meta name="author" content="Janosh Riebesell" />
+    <script>
+      // Set theme immediately to prevent flashing
+      const prefers_dark = globalThis.matchMedia('(prefers-color-scheme: dark)').matches
+      try {
+        const stored = localStorage.theme
+        const theme = ['light', 'dark'].includes(stored)
+          ? stored
+          : prefers_dark
+            ? 'dark'
+            : 'light'
+        document.documentElement.style.colorScheme = theme
+        document.documentElement.dataset.theme = theme
+      } catch {
+        document.documentElement.style.colorScheme = 'dark'
+        document.documentElement.dataset.theme = 'dark'
+      }
+    </script>
     <meta
       name="keywords"
       content="materials discovery, inorganic crystal stability, machine learning, interatomic potential, Bayesian optimization, high-throughput search, convex hull, formation energy"
@@ -16,22 +33,26 @@
 
     <meta property="og:type" content="article" />
     <meta property="og:image" content="/favicon.svg" />
-    <meta
-      property="og:url"
-      content="https://janosh.github.io/matbench-discovery"
-    />
+    <meta property="og:url" content="https://janosh.github.io/matbench-discovery" />
     <meta property="twitter:site_name" content="Matbench Discovery" />
 
     <link rel="icon" href="/favicon.svg" />
+    <!-- RSS feed -->
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      href="/rss.xml"
+      title="Matbench Discovery Models"
+    />
     <!-- analytics -->
     <script
       defer
       data-domain="matbench-discovery.materialsproject.org"
       src="https://plausible.io/js/plausible.js"
     ></script>
-    <link rel="stylesheet" href="/prism-vsc-dark-plus.css" />
+    <link rel="stylesheet" href="/prism-syntax-highlight-theme-aware.css" />
     <!-- interactive plots -->
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-3.1.0.min.js"></script>
     <!-- math display -->
     <link
       rel="stylesheet"
@@ -41,16 +62,7 @@
     %sveltekit.head%
   </head>
 
-  <body data-sveltekit-prefetch>
-    <svg style="display: none">
-      <!-- https://primer.style/octicons/link-16 -->
-      <symbol id="octicon-link" fill="currentColor">
-        <path
-          d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0z"
-        />
-      </symbol>
-    </svg>
-
-    <div>%sveltekit.body%</div>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

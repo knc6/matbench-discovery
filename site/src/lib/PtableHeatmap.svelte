@@ -1,19 +1,30 @@
 <script lang="ts">
   import { PtableInset } from '$lib'
-  import { ColorBar, PeriodicTable, TableInset, type ChemicalElement } from 'elementari'
+  import type { ChemicalElement, ElementSymbol } from 'matterviz'
+  import { ColorBar, PeriodicTable, TableInset } from 'matterviz'
+  import type { D3InterpolateName } from 'matterviz/colors'
   import type { ComponentProps } from 'svelte'
-  import { Toggle } from 'svelte-zoo'
-  import type { Snapshot } from './$types'
 
-  export let heatmap_values: Record<string, number>
-  export let color_scale: string = `Viridis`
-  export let active_element: ChemicalElement
-  export let log = false // log color scale
-  export let color_bar_props: ComponentProps<ColorBar> = {}
+  let {
+    heatmap_values,
+    color_scale = $bindable(`interpolateViridis`),
+    active_element = $bindable(null),
+    log = $bindable(false),
+    colorbar = {},
+    ...rest
+  }: ComponentProps<typeof PeriodicTable> & {
+    heatmap_values: Record<ElementSymbol, number>
+    color_scale?: D3InterpolateName
+    active_element?: ChemicalElement | null
+    log?: boolean // Log color scale
+    colorbar?: ComponentProps<typeof ColorBar>
+  } = $props()
 
-  export const snapshot: Snapshot = {
+  export const snapshot = {
     capture: () => ({ color_scale, log }),
-    restore: (values) => ({ color_scale, log } = values),
+    restore: (
+      values: { color_scale: D3InterpolateName; log: boolean },
+    ) => ({ color_scale, log } = values),
   }
 </script>
 
@@ -23,28 +34,39 @@
   {log}
   bind:active_element
   show_photo={false}
+  missing_color="rgba(255,255,255,0.3)"
+  {...rest}
 >
-  <TableInset slot="inset">
-    <label for="log">Log color scale<Toggle id="log" bind:checked={log} /></label>
-    <PtableInset element={active_element} elem_counts={heatmap_values} />
-    <ColorBar
-      label="Count"
-      label_side="top"
-      {color_scale}
-      tick_labels={5}
-      range={[0, Math.max(...Object.values(heatmap_values))]}
-      style="width: 85%; margin: 0 2em 2em;"
-      {...color_bar_props}
-    />
-  </TableInset>
+  {#snippet inset()}
+    {@const style = `height: 1.5em; visibility: ${active_element ? `visible` : `hidden`};`}
+    <TableInset>
+      <label for="log">
+        Log color scale<input id="log" type="checkbox" bind:checked={log} />
+      </label>
+      {#if active_element}
+        <PtableInset element={active_element} elem_counts={heatmap_values} {style} />
+      {:else}
+        <span {style}></span>
+      {/if}
+      <ColorBar
+        title="Count"
+        title_side="top"
+        {color_scale}
+        tick_labels={5}
+        range={[0, Math.max(0, ...(Object.values(heatmap_values) as number[]))]}
+        style="width: 85%; margin: 0 2em 2em"
+        {...colorbar}
+      />
+    </TableInset>
+  {/snippet}
 </PeriodicTable>
 
 <style>
   label {
     display: flex;
+    font-size: 1.1em;
     gap: 1ex;
     place-content: center;
-    align-items: start;
-    justify-items: center;
+    place-items: center;
   }
 </style>

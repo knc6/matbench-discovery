@@ -1,4 +1,4 @@
-import glob
+from glob import glob
 
 import pandas as pd
 import typer
@@ -9,7 +9,7 @@ from pymatviz.enums import Key
 from tqdm import tqdm
 
 from matbench_discovery.energy import get_e_form_per_atom
-from matbench_discovery.enums import MbdKey
+from matbench_discovery.enums import DataFiles, MbdKey
 
 app = typer.Typer(pretty_exceptions_enable=False, no_args_is_help=True)
 FORMATION_ENERGY_COL = "e_form_per_atom_orb"
@@ -28,14 +28,11 @@ def main(
     energy corrections to the ORB predictions and computes the corrected
     formation energies.
 
-    This script produces 4 files:
+    This script produces 2 files:
     - {predictions_dir}/{prefix}.csv.gz (all predictions)
-    - {predictions_dir}/{prefix}-no-bad.csv.gz
-      (all predictions except ones with large errors)
     - {predictions_dir}/{prefix}.json.gz (all predictions as JSON)
-    - {predictions_dir}/{prefix}-bad.csv (predictions with large errors)
     """
-    file_paths = sorted(glob.glob(f"{predictions_dir}/{glob_pattern}"))
+    file_paths = sorted(glob(f"{predictions_dir}/{glob_pattern}"))
 
     print(f"Found {len(file_paths):,} files for {glob_pattern = }")
     dfs: dict[str, pd.DataFrame] = {}
@@ -52,16 +49,17 @@ def main(
     # This is inside the script because accessing the variables causes a download
     # to be triggered if they are not present, meaning it's better to only load them
     # if the script is actually going to be run.
-    from matbench_discovery.data import DataFiles, as_dict_handler, df_wbm
+    from matbench_discovery.data import as_dict_handler, df_wbm
 
     if correct_energies:
-        df_cse = pd.read_json(DataFiles.wbm_computed_structure_entries.path).set_index(
-            Key.mat_id
-        )
+        wbm_cse_path = DataFiles.wbm_computed_structure_entries.path
+        df_wbm_cse = pd.read_json(wbm_cse_path, lines=True).set_index(Key.mat_id)
 
-        df_cse[Key.cse] = [
+        df_wbm_cse[Key.computed_structure_entry] = [
             ComputedStructureEntry.from_dict(dct)
-            for dct in tqdm(df_cse[Key.cse], desc="Loading CSEs")
+            for dct in tqdm(
+                df_wbm_cse[Key.computed_structure_entry], desc="Hydrate CSEs"
+            )
         ]
 
         # transfer predicted energies and relaxed structures WBM CSEs since
@@ -74,15 +72,15 @@ def main(
             mat_id, struct_dict, orb_energy, *_ = row
             mlip_struct = Structure.from_dict(struct_dict)
             df_orb.loc[mat_id, STRUCT_COL] = mlip_struct
-            cse = df_cse.loc[mat_id, Key.cse]
+            cse = df_wbm_cse.loc[mat_id, Key.computed_structure_entry]
             # cse._energy is the uncorrected energy
             cse._energy = orb_energy  # noqa: SLF001
             cse._structure = mlip_struct  # noqa: SLF001
-            df_orb.loc[mat_id, Key.cse] = cse
+            df_orb.loc[mat_id, Key.computed_structure_entry] = cse
 
         # apply energy corrections inplace
         processed = MaterialsProject2020Compatibility().process_entries(
-            df_orb[Key.cse], verbose=True, clean=True
+            df_orb[Key.computed_structure_entry], verbose=True, clean=True
         )
         if len(processed) != len(df_orb):
             raise ValueError(
@@ -94,7 +92,8 @@ def main(
         df_orb[FORMATION_ENERGY_COL] = [
             get_e_form_per_atom(dict(energy=cse.energy, composition=formula))
             for formula, cse in tqdm(
-                df_orb.set_index(Key.formula)[Key.cse].items(), total=len(df_orb)
+                df_orb.set_index(Key.formula)[Key.computed_structure_entry].items(),
+                total=len(df_orb),
             )
         ]
 
@@ -109,7 +108,7 @@ def main(
 
     df_wbm[[*df_orb]] = df_orb
 
-    bad_mask = (df_wbm[FORMATION_ENERGY_COL] - df_wbm[MbdKey.e_form_dft]) < -5
+    bad_mask = abs(df_wbm[FORMATION_ENERGY_COL] - df_wbm[MbdKey.e_form_dft]) > 5
     print(f"{sum(bad_mask)=}")
 
     # e.g orbFF-v1-2024-07-11-shard-001.json.gz -> orbFF-v1-2024-07-11
@@ -121,12 +120,12 @@ def main(
 
     df_orb = df_orb.round(4)
     df_orb.select_dtypes("number").to_csv(f"{out_path}.csv.gz")
-    df_orb[~bad_mask].select_dtypes("number").to_csv(f"{out_path}-no-bad.csv.gz")
-    df_orb.reset_index().to_json(f"{out_path}.json.gz", default_handler=as_dict_handler)
-
-    df_bad = df_orb[bad_mask].drop(columns=[Key.cse, STRUCT_COL], errors="ignore")
-    df_bad[MbdKey.e_form_dft] = df_wbm[MbdKey.e_form_dft]
-    df_bad.to_csv(f"{out_path}-bad.csv")
+    df_orb.reset_index().to_json(
+        f"{out_path}.json.gz",
+        default_handler=as_dict_handler,
+        orient="records",
+        lines=True,
+    )
 
 
 if __name__ == "__main__":

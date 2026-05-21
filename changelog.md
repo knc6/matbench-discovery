@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file. Dates are d
 > 6 September 2024
 
 - Add metrics table download buttons [`#135`](https://github.com/janosh/matbench-discovery/pull/135)
-- Restore MPTrj EDA to working order [`#130`](https://github.com/janosh/matbench-discovery/pull/130)
+- Restore MPtrj EDA to working order [`#130`](https://github.com/janosh/matbench-discovery/pull/130)
 - Refactor model preds loading to use new required `pred_col` key in YAML metadata files [`#134`](https://github.com/janosh/matbench-discovery/pull/134)
 - Orb models [`#133`](https://github.com/janosh/matbench-discovery/pull/133)
 - Allow multiple training sets per model in YAML metadata [`#132`](https://github.com/janosh/matbench-discovery/pull/132)
@@ -168,7 +168,6 @@ All notable changes to this project will be documented in this file. Dates are d
 > 7 July 2023
 
 - v0.1.5 [`#44`](https://github.com/janosh/matbench-discovery/pull/44)
-- [pre-commit.ci] pre-commit autoupdate [`#42`](https://github.com/janosh/matbench-discovery/pull/42)
 - Update site to show ALIGNN results [`#38`](https://github.com/janosh/matbench-discovery/pull/38)
 - ALIGNN test on WBM data [`#37`](https://github.com/janosh/matbench-discovery/pull/37)
 - Add PDF versions of all SI figures [`#36`](https://github.com/janosh/matbench-discovery/pull/36)

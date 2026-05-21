@@ -1,34 +1,36 @@
 """Global variables used all across the matbench_discovery package."""
 
-import json
 import os
 import warnings
 from datetime import UTC, datetime
-from importlib.metadata import Distribution, version
 
-import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.io as pio
-import pymatviz  # noqa: F401 # needed for pymatviz_dark template
-
-from matbench_discovery.enums import MbdKey, Quantity
+import pymatviz as pmv  # needed for pymatviz_dark template
 
 PKG_NAME = "matbench-discovery"
-__version__ = version(PKG_NAME)
-direct_url = Distribution.from_name(PKG_NAME).read_text("direct_url.json") or "{}"
-pkg_is_editable = json.loads(direct_url).get("dir_info", {}).get("editable", False)
+__version__ = "1.3.1"
 
-PKG_DIR = os.path.dirname(__file__)
-# repo root directory if editable install, else the pkg directory
-ROOT = os.path.dirname(PKG_DIR) if pkg_is_editable else PKG_DIR
+PKG_DIR = os.path.dirname(__file__)  # Python package directory
+ROOT = os.path.dirname(PKG_DIR)  # repo root directory
 DATA_DIR = f"{ROOT}/data"  # directory to store raw data
+TEST_FILES = f"{ROOT}/tests/files"  # directory to store test data
 SITE_FIGS = f"{ROOT}/site/src/figs"  # directory for interactive figures
 # directory to write model analysis for website
-SITE_LIB = f"{ROOT}/site/src/lib"
+SITE_DIR = f"{ROOT}/site/src"
 SCRIPTS = f"{ROOT}/scripts"  # model and date analysis scripts
 PDF_FIGS = f"{ROOT}/paper/figs"  # directory for light-themed PDF figures
 
-for directory in (SITE_FIGS, SITE_LIB, PDF_FIGS):
+# directory to cache downloaded data files
+DEFAULT_CACHE_DIR = os.getenv(
+    "MBD_CACHE_DIR",
+    DATA_DIR  # use DATA_DIR to locally cache data files if full repo was cloned
+    if os.path.isdir(DATA_DIR)
+    # use ~/.cache if matbench-discovery was installed from PyPI
+    else os.path.expanduser("~/.cache/matbench-discovery"),
+)
+
+for directory in (SITE_FIGS, SITE_DIR, PDF_FIGS):
     os.makedirs(directory, exist_ok=True)
 
 os.makedirs(MP_DIR := f"{DATA_DIR}/mp", exist_ok=True)
@@ -44,7 +46,7 @@ WANDB_PATH = "janosh/matbench-discovery"
 STABILITY_THRESHOLD = 0
 
 timestamp = f"{datetime.now(tz=UTC):%Y-%m-%d@%H-%M-%S}"
-today = timestamp.split("@")[0]
+today = timestamp.split("@", maxsplit=1)[0]
 
 # filter pymatgen warnings that spam the logs when e.g. applying corrections to
 # ComputedStructureEntries or using PatchedPhaseDiagram to get e_above_hull
@@ -52,14 +54,18 @@ today = timestamp.split("@")[0]
 # > No electronegativity for Ne. Setting to NaN. This has no physical meaning
 # and MaterialsProject2020Compatibility to get formation energies
 # > Failed to guess oxidation states for Entry
-warnings.filterwarnings(action="ignore", category=UserWarning, module="pymatgen")
+for msg, category, module in {
+    ("No electronegativity for", UserWarning, "pymatgen"),
+    ("Failed to guess oxidation states for Entry", UserWarning, "pymatgen"),
+    ("torch.load", FutureWarning, ""),
+    ("logm result may be inaccurate, approximate err", RuntimeWarning, ""),
+}:
+    warnings.filterwarnings(
+        action="ignore", category=category, module=module, message=msg
+    )
 
 
 # --- start global plot settings
-px.defaults.labels = (  # Quantity last to get precedence over Key and Model
-    MbdKey.val_label_dict() | Quantity.key_val_dict()
-)
-
 global_layout = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     font_size=13,
@@ -73,12 +79,4 @@ px.defaults.template = "pymatviz_dark+mbd_global"
 # https://github.com/plotly/Kaleido/issues/122#issuecomment-994906924
 # when seeing MathJax "loading" message in exported PDFs,
 # use pio.kaleido.scope.mathjax = None
-
-
-plt.rc("font", size=14)
-plt.rc("legend", fontsize=16, title_fontsize=16)
-plt.rc("axes", titlesize=16, labelsize=16)
-plt.rc("savefig", bbox="tight", dpi=200)
-plt.rc("figure", dpi=200, titlesize=16)
-plt.rcParams["figure.constrained_layout.use"] = True
 # --- end global plot settings

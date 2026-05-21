@@ -14,9 +14,15 @@ on:
         options: [tests, release]
         default: tests
         description: Only run tests or release a new version of pymatgen to PyPI after tests pass.
+  workflow_call:
+
+concurrency:
+  # Cancel only on same PR number
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  tests:
+  pytest:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -24,6 +30,30 @@ jobs:
     with:
       os: ${{ matrix.os }}
       python-version: "3.11"
+      # TODO remove main branch install of pymatviz after next release
+      install-cmd: |
+        uv pip install -e .[test,symmetry] --system
+        uv pip install git+https://github.com/janosh/pymatviz --system
+
+  vitest:
+    defaults:
+      run:
+        working-directory: site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v6
+
+      - name: Set up node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run unit tests
+        run: npm test
 
   scripts:
     runs-on: ubuntu-latest
@@ -31,18 +61,15 @@ jobs:
       fail-fast: false
       matrix:
         script:
-          - scripts/model_figs/metrics_tables.py
-          - scripts/model_figs/rolling_mae_vs_hull_dist_models.py
-          - scripts/model_figs/cumulative_metrics.py
-          - scripts/rolling_mae_vs_hull_dist.py
-          - scripts/hist_classified_stable_vs_hull_dist.py
-          - scripts/model_figs/hist_classified_stable_vs_hull_dist_models.py
+          - scripts/evals/discovery.py
+          # TODO run_all.py was commented out during removal of WBM energy preds from version control. consider partially reinstating with on-the-fly downloaded or mock WBM energy preds
+          # - scripts/model_figs/run_all.py
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 

@@ -1,11 +1,304 @@
-"$schema": http://json-schema.org/draft-07/schema#
+'$schema': http://json-schema.org/draft-07/schema#
+
+definitions:
+  # Shared URL schema for all HTTP(S) URLs
+  http_url:
+    type: string
+    format: uri
+    pattern: '^https?://'
+
+  # Shared schema for prediction files
+  pred_files:
+    type: object
+    additionalProperties: false
+    properties:
+      pred_file:
+        type: [string, 'null']
+      pred_file_url:
+        type: [string, 'null']
+        $ref: '#/definitions/http_url'
+    allOf:
+      - if:
+          properties:
+            pred_file: { type: string }
+          required: [pred_file]
+        then:
+          required: [pred_file_url]
+          properties:
+            pred_file_url:
+              $ref: '#/definitions/http_url'
+
+  # Define a shared schema for authors and trained_by
+  person:
+    type: object
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+      affiliation:
+        type: string
+      email:
+        type: string
+        format: email
+      url: &url
+        type: string
+        format: uri
+      orcid: *url
+      github: *url
+      corresponding:
+        type: boolean
+    required: [name]
+
+  ModelType:
+    type: string
+    enum: [GNN, UIP, BO-GNN, Fingerprint, Transformer, RF]
+
+  TargetType:
+    type: string
+    enum: [E, EF_G, EF_D, EFS_G, EFSH_G, EFS_D, EFS_GM, EFS_DM]
+
+  PhononMetrics:
+    type: object
+    additionalProperties: false
+    properties:
+      kappa_103:
+        type: object
+        additionalProperties: false
+        properties:
+          pred_file:
+            type: [string, 'null']
+          pred_file_url:
+            type: [string, 'null']
+            $ref: '#/definitions/http_url'
+          κ_SRME:
+            type: number
+          κ_SRE:
+            type: number
+        allOf:
+          - if:
+              properties:
+                pred_file: { type: string }
+              required: [pred_file]
+            then:
+              required: [pred_file_url]
+              properties:
+                pred_file_url:
+                  $ref: '#/definitions/http_url'
+        required: ['κ_SRME']
+
+  GeoOptMetrics:
+    type: object
+    additionalProperties: false
+    properties:
+      struct_col:
+        type: string
+      pred_file:
+        type: [string, 'null']
+      pred_file_url:
+        type: [string, 'null']
+        $ref: '#/definitions/http_url'
+      symprec=1e-5: &symprec_metrics
+        type: object
+        additionalProperties: false
+        properties:
+          rmsd:
+            type: number
+          n_sym_ops_mae:
+            type: number
+          symmetry_decrease:
+            type: number
+          symmetry_match:
+            type: number
+          symmetry_increase:
+            type: number
+          n_structures:
+            type: number
+          analysis_file:
+            type: [string, 'null']
+          analysis_file_url:
+            type: [string, 'null']
+            $ref: '#/definitions/http_url'
+        required:
+          - rmsd
+          - n_sym_ops_mae
+          - symmetry_decrease
+          - symmetry_match
+          - symmetry_increase
+          - n_structures
+      symprec=1e-2: *symprec_metrics
+    allOf:
+      - if:
+          properties:
+            pred_file: { type: string }
+          required: [pred_file]
+        then:
+          required: [pred_file_url]
+          properties:
+            pred_file_url:
+              $ref: '#/definitions/http_url'
+
+  DiscoveryMetricsSet:
+    type: object
+    additionalProperties: false
+    properties:
+      F1:
+        type: number
+      DAF:
+        type: number
+      Precision:
+        type: number
+      Recall:
+        type: number
+      Accuracy:
+        type: number
+      TPR:
+        type: number
+      FPR:
+        type: number
+      TNR:
+        type: number
+      FNR:
+        type: number
+      TP:
+        type: number
+      FP:
+        type: number
+      TN:
+        type: number
+      FN:
+        type: number
+      MAE:
+        type: number
+      RMSE:
+        type: number
+      R2:
+        type: number
+      missing_preds:
+        type: number
+    required:
+      - F1
+      - DAF
+      - Precision
+      - Recall
+      - Accuracy
+      - TPR
+      - FPR
+      - TNR
+      - FNR
+      - TP
+      - FP
+      - TN
+      - FN
+      - MAE
+      - RMSE
+      - R2
+      - missing_preds
+
+  DiscoveryMetrics:
+    type: object
+    additionalProperties: false
+    required: [pred_col]
+    properties:
+      pred_col:
+        type: string
+      pred_file:
+        type: [string, 'null']
+      pred_file_url:
+        type: [string, 'null']
+        $ref: '#/definitions/http_url'
+      full_test_set:
+        $ref: '#/definitions/DiscoveryMetricsSet'
+      most_stable_10k:
+        $ref: '#/definitions/DiscoveryMetricsSet'
+      unique_prototypes:
+        $ref: '#/definitions/DiscoveryMetricsSet'
+    allOf:
+      - if:
+          properties:
+            pred_file: { type: string }
+          required: [pred_file]
+        then:
+          required: [pred_file_url]
+          properties:
+            pred_file_url:
+              $ref: '#/definitions/http_url'
+
+  DiatomicsMetrics:
+    type: object
+    additionalProperties: false
+    properties:
+      pred_file:
+        type: [string, 'null']
+      pred_file_url:
+        type: [string, 'null']
+        $ref: '#/definitions/http_url'
+      smoothness:
+        type: number
+      tortuosity:
+        type: number
+      conservation:
+        type: number
+      energy_diff_flips:
+        type: number
+      energy_grad_norm_max:
+        type: number
+      energy_jump:
+        type: number
+      force_mae:
+        type: number
+      force_flips:
+        type: number
+      force_total_variation:
+        type: number
+      force_jump:
+        type: number
+      force_conservation:
+        type: number
+    allOf:
+      - if:
+          properties:
+            pred_file: { type: string }
+          required: [pred_file]
+        then:
+          required: [pred_file_url]
+          properties:
+            pred_file_url:
+              $ref: '#/definitions/http_url'
+
+  # Define license types from dataset schema
+  license_enum:
+    type: string
+    enum:
+      - MIT
+      - Apache-2.0
+      - CC-BY-4.0
+      - CC-BY-SA-4.0
+      - CC-BY-NC-4.0
+      - GPL-3.0
+      - BSD-3-Clause
+      - LGPL-3.0
+      - Meta Research
+      - ASL
+      - unreleased
+    description: |
+      License type:
+      - MIT: Massachusetts Institute of Technology
+      - CC-BY-4.0: Creative Commons Attribution 4.0 International
+      - CC-BY-NC-4.0: Creative Commons Attribution-NonCommercial 4.0 International
+      - CC-BY-SA-4.0: Creative Commons Attribution-ShareAlike 4.0 International
+      - GPL-3.0: GNU General Public v3.0
+      - BSD-3-Clause: Berkeley Software Distribution 3-Clause
+      - LGPL-3.0: GNU Lesser General Public License v3.0
+      - ASL: Academic Software License
+      - unreleased: No license since not released
+
 type: object
 properties:
   model_name:
     type: string
-  model_version:
+  model_key:
     type: string
-  matbench_discovery_version:
+  model_version:
     type: string
   date_added: &date
     type: string
@@ -14,36 +307,59 @@ properties:
   authors:
     type: array
     items:
-      type: object
-      properties:
-        name:
-          type: string
-        affiliation:
-          type: string
-        email:
-          type: string
-          format: email
-        orcid: &url
-          type: string
-          format: uri
-      required: [name]
+      $ref: '#/definitions/person'
+    minItems: 1
+    allOf:
+      - if:
+          properties:
+            '0': {}
+          required: ['0']
+        then:
+          properties:
+            '0':
+              required: ['email']
   trained_by:
     type: array
     items:
-      type: object
-      properties:
-        name:
-          type: string
-        affiliation:
-          type: string
-        orcid: *url
-        github: *url
-      required: [name]
+      $ref: '#/definitions/person'
   repo: *url
   doi: *url
   paper: *url
   url: *url
   pypi: *url
+  pr_url: *url
+  checkpoint_url:
+    oneOf:
+      - type: string
+        format: uri
+        $ref: '#/definitions/http_url'
+      - type: string
+        enum: [missing]
+  license:
+    type: object
+    additionalProperties: false
+    required: [code, checkpoint]
+    properties:
+      code:
+        $ref: '#/definitions/license_enum'
+        description: License for the model code
+      code_url:
+        oneOf:
+          - type: string
+            format: uri
+            $ref: '#/definitions/http_url'
+          - type: string
+            enum: [missing]
+      checkpoint:
+        $ref: '#/definitions/license_enum'
+        description: License for the model checkpoint
+      checkpoint_url:
+        oneOf:
+          - type: string
+            format: uri
+            $ref: '#/definitions/http_url'
+          - type: string
+            enum: [missing]
   requirements:
     type: object
     patternProperties:
@@ -64,17 +380,27 @@ properties:
         - Alex
         - OMat24
         - sAlex
+        - OpenLAM
+        - MDR PBE Phonons in MPtrj
+        - COSMOSDataset
   hyperparams:
     type: object
+    additionalProperties: true
     properties:
       max_force:
         type: number
+        description: Maximum remaining force allowed on any atom in eV/Å for geometry optimization convergence
       max_steps:
         type: number
+        description: Maximum number of optimization steps allowed
       optimizer:
         type: string
       ase_optimizer:
         type: string
+        description: ASE optimizer used for structure relaxation (e.g., FIRE, LBFGS, BFGS, GOQN)
+      cell_filter:
+        type: string
+        description: ASE cell filter used during relaxation (e.g., FrechetCellFilter, ExpCellFilter)
       learning_rate:
         type: number
       batch_size:
@@ -83,28 +409,54 @@ properties:
         type: number
       n_layers:
         type: number
-      radial_cutoff:
+      graph_construction_radius:
         type: number
+        description: Cutoff radius in Angstroms for graph construction (required for GNN and UIP models)
+      max_neighbors:
+        oneOf:
+          - type: number
+          - type: string
+            enum: [missing]
+        description: Maximum number of neighbors to consider in graph construction (required for GNN and UIP models)
   notes:
     type: object
+    additionalProperties: true
     properties:
       Description:
         type: string
       Training:
-        oneOf:
-          - type: string
-          - type: object
-            additionalProperties:
-              type: string
-      Missing Preds:
         type: string
-    additionalProperties: true
+      html:
+        type: object
+        additionalProperties:
+          type: string
   model_params:
     type: number
     minimum: 0
   n_estimators:
     type: number
     minimum: 1
+  training_cost:
+    oneOf:
+      - type: object
+        minProperties: 1
+        patternProperties:
+          "^[a-zA-Z0-9\\s]+ (GPUs|CPUs|TPUs)$":
+            type: object
+            required: ['amount', 'hours']
+            additionalProperties: false
+            properties:
+              amount:
+                type: number
+                minimum: 1
+              hours:
+                type: number
+                minimum: 0
+              cost:
+                type: number
+                minimum: 0
+      - type: string
+        enum: [missing]
   train_task:
     type: string
     enum: &train_task_enum
@@ -122,113 +474,101 @@ properties:
       - IS2E # initial structure to energy
       - IS2RE # initial structure to relaxed energy -- CGCNN+P
       - IS2RE-SR # initial structure to relaxed energy with structure relaxation
-      - IS2RE-BO # initial structure to relaxed energy with Bayesian optimization
   model_type:
-    type: string
-    enum: [GNN, UIP, BO-GNN, Fingerprint, Transformer, RF]
+    $ref: '#/definitions/ModelType'
   targets:
-    type: string
-    enum: [E, EF_C, EF_D, EFS_C, EFS_D, EFS_CM, EFS_DM]
+    $ref: '#/definitions/TargetType'
   openness:
     type: string
     enum: [OSOD, OSCD, CSOD, CSCD]
   status:
     type: string
-    enum: [aborted, complete]
+    enum: [aborted, complete, deprecated, pending, superseded]
+    # pending: model is in review or awaiting further data/details from authors
+    # superseded: model is superseded by a newer model
+    # deprecated: model is deprecated and should not be used e.g. because serious bugs were found
+    # aborted: model was aborted before testing could be completed due e.g. to OOM/stability issues
+    # complete: model has been tested and all metrics are available (the default if no status is specified)
   metrics:
     type: object
     additionalProperties: false
     properties:
       phonons:
         oneOf:
-          - type: object
-            additionalProperties: false
-            properties:
-              κ_SRME:
-                type: number
+          - $ref: '#/definitions/PhononMetrics'
           - type: string
             enum: [not applicable, not available]
       geo_opt:
         oneOf:
-          - type: object
-            additionalProperties: false
-            properties:
-              pred_file:
-                type: [string, "null"]
-              pred_col:
-                type: [string, "null"]
+          - $ref: '#/definitions/GeoOptMetrics'
           - type: string
             enum: [not applicable, not available]
       discovery:
-        additionalProperties: false
-        type: object
-        properties:
-          additionalProperties: false
-          pred_file:
-            type: string
-          pred_col:
-            type: string
-          full_test_set: &discovery_metrics
-            type: object
-            additionalProperties: false
-            properties:
-              F1:
-                type: number
-              DAF:
-                type: number
-              Precision:
-                type: number
-              Recall:
-                type: number
-              Accuracy:
-                type: number
-              TPR:
-                type: number
-              FPR:
-                type: number
-              TNR:
-                type: number
-              FNR:
-                type: number
-              TP:
-                type: number
-              FP:
-                type: number
-              TN:
-                type: number
-              FN:
-                type: number
-              MAE:
-                type: number
-              RMSE:
-                type: number
-              R2:
-                type: number
-              missing_preds:
-                type: number
-              missing_percent:
-                type: string
-          most_stable_10k: *discovery_metrics
-          unique_prototypes: *discovery_metrics
+        oneOf:
+          - $ref: '#/definitions/DiscoveryMetrics'
+          - type: string
+            enum: [not available]
+      diatomics:
+        oneOf:
+          - $ref: '#/definitions/DiatomicsMetrics'
+          - type: string
+            enum: [not applicable, not available]
+
+# Require graph_construction_radius, max_neighbors for GNN and UIP models
+allOf:
+  - if:
+      properties:
+        model_type:
+          enum: [GNN, UIP]
+      required: [model_type]
+    then:
+      required: [hyperparams]
+      properties:
+        hyperparams:
+          required: [graph_construction_radius, max_neighbors]
+  # Require geo_opt hyperparams for MLIPs with force predictions that have geo_opt metrics
+  - if:
+      properties:
+        model_type:
+          enum: [GNN, UIP]
+        targets:
+          # Any target type that includes forces (F in the name)
+          enum: [EF_G, EF_D, EFS_G, EFSH_G, EFS_D, EFS_GM, EFS_DM]
+        metrics:
+          properties:
+            geo_opt:
+              type: object
+          required: [geo_opt]
+      required: [model_type, targets, metrics]
+    then:
+      required: [hyperparams]
+      properties:
+        hyperparams:
+          required: [ase_optimizer, max_steps, max_force, cell_filter]
 
 required:
   - authors
+  # checkpoint_url is required for all models, but can be 'not available' for closed source models
+  - checkpoint_url
   - date_added
   - date_published
   - doi
-  - matbench_discovery_version
+  - license
   - model_name
   - model_params
   - model_type
   - model_version
   - n_estimators
+  - openness
   - paper
+  - pr_url
   - repo
   - requirements
   - targets
   - test_task
   - train_task
   - trained_for_benchmark
+  - training_cost
   - training_set
-# disallow properties not in the schema
+
 additionalProperties: false

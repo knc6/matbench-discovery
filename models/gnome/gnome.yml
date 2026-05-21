@@ -1,8 +1,8 @@
 model_name: GNoME
+model_key: gnome
 model_version: n/a
-matbench_discovery_version: 1.0.0
-date_added: "2024-02-03"
-date_published: "2023-11-29"
+date_added: '2024-02-03'
+date_published: '2023-11-29'
 authors:
   - name: Amil Merchant
     affiliation: Google DeepMind
@@ -20,9 +20,27 @@ authors:
     affiliation: Google DeepMind
     email: cubuk@google.com
     orcid: https://orcid.org/0000-0003-0524-2837
+
 repo: https://github.com/google-deepmind/materials_discovery
 doi: https://doi.org/10.1038/s41586-023-06735-9
 paper: https://nature.com/articles/s41586-023-06735-9
+pr_url: https://github.com/janosh/matbench-discovery/pull/84
+checkpoint_url: missing
+
+license:
+  code: Apache-2.0
+  code_url: https://github.com/google-deepmind/materials_discovery/blob/be1fa43a9/LICENSE
+  checkpoint: unreleased
+  checkpoint_url: missing
+
+openness: OSCD
+trained_for_benchmark: false
+train_task: S2EFS
+test_task: IS2RE-SR
+targets: EF_G
+model_type: UIP
+model_params: 16_240_000
+n_estimators: 1
 
 requirements:
   e3nn-jax: 0.20.3
@@ -32,16 +50,8 @@ requirements:
   numpy: 1.26.2
   pymatgen: 2023.11.12
 
-openness: OSCD
-trained_for_benchmark: false
-train_task: S2EFS
-test_task: IS2RE-SR
-targets: EF_C
-model_type: UIP
-model_params: 16_240_000
-n_estimators: 1
-
 training_set: [GNoME]
+training_cost: missing
 
 hyperparams:
   optimizer: Adam
@@ -49,7 +59,8 @@ hyperparams:
   batch_size: 32
   n_layers: 5
   n_features: 128 l=0 scalars, 64 l=1 vectors, 32 l=2 tensors
-  radial_cutoff: 5.0 # Å
+  graph_construction_radius: 5.0 # Å
+  max_neighbors: .inf
 
 notes:
   Description: |
@@ -58,66 +69,63 @@ notes:
   Missing Preds: According to the authors, the 1734 missing WBM predictions are mostly due out-of-memory (OOM) errors. The model was evaluated on A100s but without neighbor lists. The plan is to backfill the missing predictions once H100s are available or neighbor list implementation goes live.
 
 metrics:
-  geo_opt:
-    pred_file: null # not (yet) shared by authors
-    pred_col: null
+  phonons: not available # model is closed source, original GnoME submission predates phonon tasks and DeepMind did not resubmit later
+  geo_opt: not available # author's declined to share model-relaxed structures and can't be reproduced without model access
   discovery:
-    pred_file: models/gnome/2023-11-01-gnome-preds-50076332.csv.gz
+    pred_file: models/gnome/2023-11-01-gnome-50076332-wbm-IS2RE.csv.gz
+    pred_file_url: https://figshare.com/files/52057556
     pred_col: e_gnome_after_relax
     full_test_set:
-      F1: 0.81
-      DAF: 4.81
-      Precision: 0.825
-      Recall: 0.796
-      Accuracy: 0.942
-      TPR: 0.796
-      FPR: 0.035
-      TNR: 0.965
-      FNR: 0.204
-      TP: 35082.0
-      FP: 7421.0
-      TN: 205450.0
-      FN: 9010.0
-      MAE: 0.034
-      RMSE: 0.083
-      R2: 0.786
-      missing_preds: 1744
-      missing_percent: 0.68%
+      F1: 0.81 # fraction
+      DAF: 4.81 # dimensionless
+      Precision: 0.825 # fraction
+      Recall: 0.796 # fraction
+      Accuracy: 0.936 # fraction
+      TPR: 0.796 # fraction
+      FPR: 0.035 # fraction
+      TNR: 0.965 # fraction
+      FNR: 0.204 # fraction
+      TP: 35082.0 # count
+      FP: 7421.0 # count
+      TN: 205450.0 # count
+      FN: 9010.0 # count
+      MAE: 0.034 # eV/atom
+      RMSE: 0.083 # eV/atom
+      R2: 0.786 # dimensionless
+      missing_preds: 1744 # count
     most_stable_10k:
-      F1: 0.967
-      DAF: 6.127
-      Precision: 0.937
-      Recall: 1.0
-      Accuracy: 0.937
-      TPR: 1.0
-      FPR: 1.0
-      TNR: 0.0
-      FNR: 0.0
-      TP: 9366.0
-      FP: 634.0
-      TN: 0.0
-      FN: 0.0
-      MAE: 0.035
-      RMSE: 0.089
-      R2: 0.836
-      missing_preds: 0
-      missing_percent: 0.00%
+      F1: 0.967 # fraction
+      DAF: 6.127 # dimensionless
+      Precision: 0.937 # fraction
+      Recall: 1.0 # fraction
+      Accuracy: 0.937 # fraction
+      TPR: 1.0 # fraction
+      FPR: 1.0 # fraction
+      TNR: 0.0 # fraction
+      FNR: 0.0 # fraction
+      TP: 9366.0 # count
+      FP: 634.0 # count
+      TN: 0.0 # count
+      FN: 0.0 # count
+      MAE: 0.035 # eV/atom
+      RMSE: 0.089 # eV/atom
+      R2: 0.836 # dimensionless
+      missing_preds: 0 # count
     unique_prototypes:
-      F1: 0.829
-      DAF: 5.523
-      Precision: 0.844
-      Recall: 0.814
-      Accuracy: 0.955
-      TPR: 0.814
-      FPR: 0.028
-      TNR: 0.972
-      FNR: 0.186
-      TP: 27178.0
-      FP: 5009.0
-      TN: 177105.0
-      FN: 6196.0
-      MAE: 0.035
-      RMSE: 0.085
-      R2: 0.785
-      missing_preds: 1517
-      missing_percent: 0.70%
+      F1: 0.829 # fraction
+      DAF: 5.523 # dimensionless
+      Precision: 0.844 # fraction
+      Recall: 0.814 # fraction
+      Accuracy: 0.948 # fraction
+      TPR: 0.814 # fraction
+      FPR: 0.028 # fraction
+      TNR: 0.972 # fraction
+      FNR: 0.186 # fraction
+      TP: 27178.0 # count
+      FP: 5009.0 # count
+      TN: 177105.0 # count
+      FN: 6196.0 # count
+      MAE: 0.035 # eV/atom
+      RMSE: 0.085 # eV/atom
+      R2: 0.785 # dimensionless
+      missing_preds: 1517 # count

@@ -9,17 +9,16 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import pymatviz as pmv
-from matplotlib.colors import SymLogNorm
 from pymatgen.core import Composition, Structure
-from pymatviz.enums import Key
-from pymatviz.utils import PLOTLY, si_fmt_int
+from pymatviz.enums import ElemCountMode, Key
+from pymatviz.utils import si_fmt_int
 
 from matbench_discovery import PDF_FIGS, ROOT, SITE_FIGS, STABILITY_THRESHOLD
 from matbench_discovery import plots as plots
-from matbench_discovery.data import DataFiles, df_wbm
+from matbench_discovery.data import DATASETS, df_wbm
 from matbench_discovery.energy import mp_elem_ref_entries
-from matbench_discovery.enums import MbdKey
-from matbench_discovery.preds import df_each_err
+from matbench_discovery.enums import DataFiles, MbdKey
+from matbench_discovery.preds.discovery import df_each_err
 
 __author__ = "Janosh Riebesell"
 __date__ = "2023-03-30"
@@ -34,15 +33,23 @@ df_mp = df_mp.set_index(Key.mat_id)
 
 
 # %%
-wbm_occu_counts = pmv.count_elements(df_wbm[Key.formula], count_mode="occurrence")
+wbm_occu_counts = pmv.count_elements(
+    df_wbm[Key.formula], count_mode=ElemCountMode.occurrence
+)
 wbm_occu_counts = wbm_occu_counts.dropna().astype(int)
-wbm_comp_counts = pmv.count_elements(df_wbm[Key.formula], count_mode="composition")
+wbm_comp_counts = pmv.count_elements(
+    df_wbm[Key.formula], count_mode=ElemCountMode.composition
+)
 wbm_comp_counts = wbm_comp_counts.dropna().astype(int)
 
-mp_occu_counts = pmv.count_elements(df_mp[Key.formula], count_mode="occurrence")
+mp_occu_counts = pmv.count_elements(
+    df_mp[Key.formula], count_mode=ElemCountMode.occurrence
+)
 mp_occu_counts = mp_occu_counts.dropna().astype(int)
 
-mp_comp_counts = pmv.count_elements(df_mp[Key.formula], count_mode="composition")
+mp_comp_counts = pmv.count_elements(
+    df_mp[Key.formula], count_mode=ElemCountMode.composition
+)
 mp_comp_counts = mp_comp_counts.dropna().astype(int)
 
 all_counts = (
@@ -55,11 +62,16 @@ all_counts = (
 
 # %% print prevalence of stable structures in full WBM and uniq-prototypes only
 print(f"{STABILITY_THRESHOLD=}")
-for df, label in (
-    (df_wbm, "full WBM"),
-    (df_wbm.query(Key.uniq_proto), "WBM unique prototypes"),
+for df, label, n_expected in (
+    (df_wbm, "full WBM", DATASETS["WBM"]["n_stable_materials"]),
+    (
+        df_wbm.query(MbdKey.uniq_proto),
+        "WBM unique prototypes",
+        DATASETS["WBM"]["n_uniq_stable_materials"],
+    ),
 ):
     n_stable = sum(df[MbdKey.each_true] <= STABILITY_THRESHOLD)
+    assert n_stable == n_expected, f"{label}: {n_stable=} != {n_expected=}"
     stable_rate = n_stable / len(df)
     print(f"{label}: {stable_rate=:.1%} ({n_stable:,} out of {len(df):,})")
 
@@ -70,33 +82,26 @@ for df, label in (
 
 # %%
 for dataset, count_mode, elem_counts in all_counts:
-    filename = f"{dataset}-element-counts-by-{count_mode}"
-    elem_counts.to_json(f"{data_page}/{filename}.json")
+    img_name = f"{dataset}-element-counts-by-{count_mode}"
+    elem_counts.to_json(f"{data_page}/{img_name}.json")
 
-    title = f"Number of {dataset.upper()} structures containing each element"
-    fig = pmv.ptable_heatmap_plotly(elem_counts, font_size=10, fmt=",.0f")
-    fig.layout.title.update(text=title, x=0.4, y=0.9)
-    fig.show()
-
-    # saving matplotlib heatmap to PDF mostly for historical reasons, could also use
-    # pmv.ptable_heatmap_plotly
-    ax_elem_counts = pmv.ptable_heatmap(
-        elem_counts,
-        cbar_title=f"{dataset.upper()} Element Count",
-        log=(log := SymLogNorm(linthresh=100)),
+    colorbar_title = f"Number of {dataset.upper()} structures containing each element"
+    fig_elem_counts = pmv.ptable_heatmap_plotly(
+        elem_counts, log=(log := True), colorbar=dict(title=colorbar_title)
     )
+    fig_elem_counts.show()
+
     if log:
-        filename += "-symlog" if isinstance(log, SymLogNorm) else "-log"
-    pmv.save_fig(ax_elem_counts, f"{PDF_FIGS}/{filename}.pdf")
+        img_name += "-log"
+    # pmv.save_fig(fig_elem_counts, f"{PDF_FIGS}/{filename}.pdf")
 
 
 # %% ratio of WBM to MP counts
 normalized = True
-ax_ptable = pmv.ptable_heatmap_ratio(
-    wbm_occu_counts / (len(df_wbm) if normalized else 1),
-    mp_occu_counts / (len(df_mp) if normalized else 1),
-    zero_color="#efefef",
-    exclude_elements="Xe Th Pa U Np Pu".split(),
+ax_ptable = pmv.ptable_heatmap_plotly(
+    values=(wbm_occu_counts / (len(df_wbm) if normalized else 1))
+    / (mp_occu_counts / (len(df_mp) if normalized else 1)),
+    exclude_elements=("Xe", "Th", "Pa", "U", "Np", "Pu"),
 )
 img_name = "wbm-mp-ratio-element-counts-by-occurrence"
 if normalized:
@@ -237,7 +242,7 @@ df_ref = pd.DataFrame(mp_ref_data).sort_values(atom_num_col)
 # %% plot MP elemental reference energies vs atomic number
 # marker size = number of atoms in reference structure
 fig = df_ref.round(2).plot.scatter(
-    x=atom_num_col, y=e_col, backend=PLOTLY, hover_data=list(df_ref), size=n_atoms_col
+    x=atom_num_col, y=e_col, backend="plotly", hover_data=list(df_ref), size=n_atoms_col
 )
 fig.update_traces(mode="markers+lines")
 fig.layout.margin = dict(l=0, r=0, t=0, b=0)
@@ -299,8 +304,12 @@ fig.show()
 
 
 # %%
-df_wbm[Key.spg_num] = df_wbm[MbdKey.init_wyckoff].str.split("_").str[2].astype(int)
-df_mp[Key.spg_num] = df_mp[f"{Key.wyckoff}_spglib"].str.split("_").str[2].astype(int)
+df_wbm[Key.spg_num] = (
+    df_wbm[MbdKey.init_protostructure_spglib].str.split("_").str[2].astype(int)
+)
+df_mp[Key.spg_num] = (
+    df_mp[MbdKey.protostructure_spglib].str.split("_").str[2].astype(int)
+)
 
 
 # %%
@@ -356,21 +365,30 @@ pmv.save_fig(fig, f"{PDF_FIGS}/{img_name}.pdf", width=450, height=280)
 
 # %% find large structures that changed symmetry during relaxation
 df_sym_change = (
-    df_wbm.query(f"{MbdKey.init_wyckoff} != {Key.wyckoff}_spglib")
-    .filter(regex="wyckoff|sites")
+    df_wbm.query(
+        f"{MbdKey.init_protostructure_spglib} != {MbdKey.protostructure_spglib}"
+    )
+    .filter(regex="protostructure|sites")
     .nlargest(10, Key.n_sites)
 )
 
 
 # %%
-df_wbm_structs = pd.read_json(DataFiles.wbm_cses_plus_init_structs.path)
-df_wbm_structs = df_wbm_structs.set_index(Key.mat_id)
+df_wbm_init_structs = pd.read_json(DataFiles.wbm_initial_structures.path, lines=True)
+df_wbm_init_structs = df_wbm_init_structs.set_index(Key.mat_id)
+
+df_wbm_final_structs = pd.read_json(
+    DataFiles.wbm_computed_structure_entries.path, lines=True
+)
+df_wbm_final_structs = df_wbm_final_structs.set_index(Key.mat_id)
 
 
 # %%
 for wbm_id in df_sym_change.index:
-    init_struct = Structure.from_dict(df_wbm_structs.loc[wbm_id][Key.init_struct])
-    final_struct = Structure.from_dict(df_wbm_structs.loc[wbm_id][Key.cse]["structure"])
+    init_struct = Structure.from_dict(df_wbm_init_structs.loc[wbm_id][Key.init_struct])
+    final_struct = Structure.from_dict(
+        df_wbm_final_structs.loc[wbm_id][Key.computed_structure_entry]["structure"]
+    )
     init_struct.properties[Key.mat_id] = f"{wbm_id}-init"
     final_struct.properties[Key.mat_id] = f"{wbm_id}-final"
 
@@ -380,10 +398,12 @@ for wbm_id in df_sym_change.index:
 # %% export initial and final structures with symmetry change to CIF
 wbm_id = df_sym_change.index[0]
 
-struct = Structure.from_dict(df_wbm_structs.loc[wbm_id][Key.cse]["structure"])
+struct = Structure.from_dict(
+    df_wbm_final_structs.loc[wbm_id][Key.computed_structure_entry]["structure"]
+)
 struct.to(f"{module_dir}/{wbm_id}.cif")
 struct.to(f"{module_dir}/{wbm_id}.json")
 
-struct = Structure.from_dict(df_wbm_structs.loc[wbm_id][Key.init_struct])
+struct = Structure.from_dict(df_wbm_init_structs.loc[wbm_id][Key.init_struct])
 struct.to(f"{module_dir}/{wbm_id}-init.cif")
 struct.to(f"{module_dir}/{wbm_id}-init.json")

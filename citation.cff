@@ -5,7 +5,7 @@ subtitle: An evaluation framework for machine learning crystal stability predict
 authors:
   - given-names: Janosh
     family-names: Riebesell
-    affiliation: University of Cambridge, Lawrence Berkeley National Lab
+    affiliation: University of Cambridge, LBNL
     email: janosh.riebesell@gmail.com
     orcid: https://orcid.org/0000-0001-5233-3462
     corresponding: true
@@ -19,7 +19,7 @@ authors:
     github: https://github.com/comprhys
   - given-names: Philipp
     family-names: Benner
-    affiliation: German Federal Institute of Materials Research and Testing (BAM)
+    affiliation: German Federal Institute of Materials Research and Testing
     orcid: 0000-0002-0912-8137
     affil_key: 3
     github: https://github.com/pbenner
@@ -41,6 +41,16 @@ authors:
     affiliation: University of Cambridge
     affil_key: 1
     github: https://github.com/alphaleegroup
+  - given-names: Gerbrand
+    family-names: Ceder
+    affiliation: Lawrence Berkeley National Lab
+    orcid: 0000-0001-9275-3605
+    affil_key: 2
+  - given-names: Mark
+    family-names: Asta
+    affiliation: Lawrence Berkeley National Lab
+    orcid: 0000-0002-8968-321X
+    affil_key: 2
   - given-names: Anubhav
     family-names: Jain
     orcid: 0000-0001-5893-9967
@@ -63,6 +73,6 @@ license-url: https://github.com/janosh/matbench-discovery/blob/-/license"
 repository-code: https://github.com/janosh/matbench-discovery
 type: software
 url: https://github.com/janosh/matbench-discovery
-doi: 10.48550/arXiv.2308.14920
-version: 1.0.0 # replace with whatever Matbench Discovery version you use
-date-released: "2023-08-28"
+doi: https://doi.org/10.1038/s42256-025-01055-1
+version: 1.3.1 # replace with whatever Matbench Discovery version you use
+date-released: "2023-08-28" # date of arXiv submission
