@@ -1,39 +1,42 @@
-# ALIGNN-FF (submission aborted)
+# ALIGNN-FF
 
-The [ALIGNN FF model submission](https://github.com/janosh/matbench-discovery/pull/47) intended to get a complete set of formation energy predictions for the WBM test set post-ALIGNN-FF structure relaxation (i.e. the WBM IS2RE task).
+[ALIGNN-FF](https://arxiv.org/abs/2209.05554) is a universal interatomic potential built on
+the [ALIGNN](https://arxiv.org/abs/2106.01829) (Atomistic Line Graph Neural Network)
+architecture. ALIGNN performs message passing on both the atom graph and its line graph,
+which encodes bond angles, allowing it to capture three-body interactions.
 
-This effort was aborted for the following reasons:
-
-1. **Incompatibility issues**: ALIGNN-FF was pre-trained on the JARVIS data, which among other differences uses the OptB88vdW functional and is incompatible with the WBM test set generated using Materials Project workflows.
-1. **Training difficulties**: ALIGNN-FF proved to be very resource-hungry. [12 GB of MPtrj training data](https://figshare.com/articles/dataset/23713842) turned into 600 GB of ALIGNN graph data. This forces small batch size even on nodes with large GPU memory, which slowed down training.
-1. **Ineffectiveness of fine-tuning**: Efforts to fine-tune the ALIGNN-FF WT10 model on the CHGNet data suffered high initial loss, even worse than the untrained model, indicating significant dataset incompatibility.
-
-The decision to abort testing ALIGNN FF was made after weeks of work due to ongoing technical challenges and resource limitations. See the [PR discussion](https://github.com/janosh/matbench-discovery/pull/47) for further details.
-
-## Fine-tuning
-
-We attempted fine-tuning the [`alignnff_wt10` checkpoint](https://github.com/usnistgov/alignn/blob/461b35fe/alignn/ff/alignnff_wt10/best_model.pt).
-
-The patch `alignn-ff-2023.07.05.patch` fixes the following issue:
-
-```bash
-Traceback (most recent call last):
-  File "alignn_relax.py", line 96, in <module>
-  File "alignn_relax.py", line 88, in alignn_relax
-  File "../alignn/ff/ff.py", line 310, in optimize_atoms
-  File "../alignn/lib/python3.9/site-packages/ase/optimize/optimize.py", line 269, in run
-  File "../alignn/lib/python3.9/site-packages/ase/optimize/optimize.py", line 156, in run
-  File "../alignn/lib/python3.9/site-packages/ase/optimize/optimize.py", line 129, in irun
-  File "../alignn/lib/python3.9/site-packages/ase/optimize/optimize.py", line 108, in call_observers
-  File "../alignn/lib/python3.9/site-packages/ase/io/trajectory.py", line 132, in write
-  File "../alignn/lib/python3.9/site-packages/ase/io/trajectory.py", line 156, in _write_atoms
-  File "../alignn/lib/python3.9/site-packages/ase/io/trajectory.py", line 381, in write_atoms
-  File "../alignn/lib/python3.9/site-packages/ase/io/ulm.py", line 400, in write
-  File "../alignn/lib/python3.9/site-packages/ase/io/ulm.py", line 325, in fill
-OSError: [Errno 24] Too many open files
-```
+This submission evaluates the **default ALIGNN-FF force field** bundled with the
+[`alignn`](https://pypi.org/project/alignn) package. The checkpoint is loaded via
+`alignn.ff.ff.default_path()` and exposed to ASE through `AlignnAtomwiseCalculator`, so no
+manual checkpoint download is required — installing `alignn` is sufficient.
 
 ## Scripts
 
-1. [`alignn_ff_relax.py`](alignn_ff_relax.py): Relax WBM test set structures. Set the variable `n_splits` to the number of GPU compute nodes. On each compute node, set the environment variable `TASK_ID` to a value in the range 1-`n_splits`. Set the variable `n_processes_per_task` to the number of processes on a single node. For 48 CPU cores with 4 GPUs a good setting is to use 10 processes.
-2. [`test_alignn_ff_discovery.py`](test_alignn_ff_discovery.py): Read the relaxed structures from `alignn_ff_relax.py` and make formation energy predictions. Set the variable `n_splits` accordingly.
+| File | Task | Description |
+| --- | --- | --- |
+| [`test_alignn_ff_discovery.py`](test_alignn_ff_discovery.py) | discovery / geo-opt | Relaxes the WBM initial structures with ASE FIRE (positions + cell) and records final structures, energies and trajectories. |
+| [`join_alignn_ff_preds.py`](join_alignn_ff_preds.py) | discovery / geo-opt | Concatenates the relaxation outputs, applies the MP2020 energy corrections and computes formation energies, producing `*-wbm-IS2RE.csv.gz` and `*-wbm-geo-opt-FIRE.jsonl.gz`. |
+| [`test_alignn_ff_kappa.py`](test_alignn_ff_kappa.py) | phonons | Predicts lattice thermal conductivity κ for the PhononDB PBE-103 set via phono3py. |
+
+## Reproducing
+
+Each script declares its dependencies inline (PEP 723), so it can be run directly with
+[`uv`](https://docs.astral.sh/uv):
+
+```sh
+# 1. relax the WBM test set (set TASK_ID / TASK_COUNT to split across nodes)
+uv run test_alignn_ff_discovery.py
+
+# 2. post-process into discovery + geo-opt submission files
+uv run join_alignn_ff_preds.py
+
+# 3. predict thermal conductivity
+uv run test_alignn_ff_kappa.py
+```
+
+## Notes
+
+An earlier ALIGNN-FF submission ([PR #47](https://github.com/janosh/matbench-discovery/pull/47))
+was aborted in 2023 due to training-data incompatibility and resource limitations while
+attempting to fine-tune the `alignnff_wt10` checkpoint on MPtrj. This submission instead
+evaluates the released default ALIGNN-FF force field directly without fine-tuning.

@@ -277,9 +277,7 @@ class Model(Files, base_dir=f"{ROOT}/models"):
     alignn = auto(), "alignn/alignn.yml"
 
     # alignn-ff with local pooling: https://arxiv.org/abs/2209.05554
-    # Commented out because the model could not be evaluated due to OOM errors
-    # see models/alignn_ff/readme.md
-    # alignn_ff = auto(), "alignn/alignn-ff.yml"
+    alignn_ff = auto(), "alignn_ff/alignn-ff.yml"
 
     # Allegro (NequIP arch)
     allegro_oam_l_0_1 = auto(), "allegro/allegro-OAM-L-0.1.yml"
