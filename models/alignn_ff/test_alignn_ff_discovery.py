@@ -29,11 +29,12 @@ produce the discovery (`*-wbm-IS2RE.csv.gz`) and geometry-optimization
 """
 
 # %%
+# conda activate chipsff
 import os
 from copy import deepcopy
 from importlib.metadata import version
 from typing import Any
-
+from jarvis.core.atoms import ase_to_atoms
 import numpy as np
 import pandas as pd
 import torch
@@ -54,7 +55,7 @@ import matgl
 from matgl.ext.ase import M3GNetCalculator
 from chgnet.model.dynamics import CHGNetCalculator
 
-alignn_calc =  CHGNetCalculator()
+#ZZalignn_calc =  CHGNetCalculator()
 
 
 __author__ = "Kamal Choudhary, Philipp Benner, Janosh Riebesell"
@@ -65,7 +66,7 @@ __date__ = "2026-05-20"
 task_type = Task.IS2RE
 module_dir = os.path.dirname(__file__)
 ase_optimizer = "FIRE"
-max_steps = 500
+max_steps = 150
 force_max = 0.05  # run until forces are smaller than this in eV/Å
 record_traj = True  # record intermediate structures into a pymatgen Trajectory
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -96,7 +97,7 @@ if task_count > 1 and task_id != 0:
 # %% load ALIGNN-FF as an ASE calculator
 print(f"Loading default ALIGNN-FF checkpoint on {device=}")
 alignn_calc = AlignnAtomwiseCalculator(
-    path=default_path(), stress_wt=0.01,device=device, include_stress=True
+    path=default_path(), stress_wt=1.0,device=device, include_stress=True
 )
 
 run_params = {
@@ -128,7 +129,7 @@ for atoms in tqdm(deepcopy(atoms_list), desc="Relaxing with ALIGNN-FF"):
 
         init_struct = AseAtomsAdaptor.get_structure(atoms)
         print(f"\n=== {mat_id}: initial structure ===")
-        print(init_struct)
+        print(ase_to_atoms(atoms))
 
         if max_steps > 0:
             filtered_atoms = ExpCellFilter(atoms)
@@ -145,7 +146,10 @@ for atoms in tqdm(deepcopy(atoms_list), desc="Relaxing with ALIGNN-FF"):
         energy = atoms.get_potential_energy()  # relaxed total energy
         relaxed_struct = AseAtomsAdaptor.get_structure(atoms)
         print(f"\n=== {mat_id}: optimized structure (energy={energy:.4f} eV) ===")
-        print(relaxed_struct)
+        print(ase_to_atoms(atoms))
+        print()
+        print()
+        print()
         relax_results[mat_id] = {"structure": relaxed_struct, "energy": energy}
 
         if record_traj and coords and lattices and energies:
