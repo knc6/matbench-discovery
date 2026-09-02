@@ -1,45 +1,48 @@
 model_name: ALIGNN FF
 model_key: alignn-ff
-model_version: 2024.5.27
-date_added: '2026-05-20'
-date_published: '2022-09-16'
+model_version: 2023.07.01
+
+dates:
+  benchmark_added: '2023-07-11'
+  paper_published: '2022-09-16'
+
+lifecycle: active
+
 authors:
   - name: Kamal Choudhary
     affiliation: National Institute of Standards and Technology
     email: kamal.choudhary@nist.gov
     orcid: https://orcid.org/0000-0001-9737-8074
-    corresponding: true
-    role: Model & PR
   - name: Brian DeCost
     affiliation: National Institute of Standards and Technology
     orcid: https://orcid.org/0000-0002-3459-5888
-    role: Model
   - name: Lily Major
     affiliation: Aberystwyth University, UK
     orcid: https://orcid.org/0000-0002-5783-8432
-    role: Model
   - name: Keith Butler
     affiliation: Rutherford Appleton Laboratory, UK
     orcid: https://orcid.org/0000-0001-5432-5597
-    role: Model
   - name: Jeyan Thiyagalingam
     affiliation: Rutherford Appleton Laboratory, UK
     orcid: https://orcid.org/0000-0002-2167-1343
-    role: Model
   - name: Francesca Tavazza
     affiliation: National Institute of Standards and Technology
     orcid: https://orcid.org/0000-0002-5602-180X
-    role: Model
+
+trained_by:
+  - name: Philipp Benner
+    affiliation: Bundesanstalt für Materialforschung und -prüfung BAM
+    orcid: https://orcid.org/0000-0002-0912-8137
+    github: https://github.com/pbenner
 
 repo: https://github.com/usnistgov/alignn
-url: https://jarvis.nist.gov/jalignn
 doi: https://doi.org/10.1039/D2DD00096B
 paper: https://arxiv.org/abs/2209.05554
+docs: https://atomgptlab.github.io/alignn/
 pypi: https://pypi.org/project/alignn
-pr_url: https://github.com/janosh/matbench-discovery/pull/TODO
-# checkpoint is the default ALIGNN-FF force field shipped with the alignn package,
-# loaded via alignn.ff.ff.default_path(), see https://github.com/usnistgov/alignn/tree/main/alignn/ff
-checkpoint_url: https://github.com/usnistgov/alignn/raw/main/alignn/ff/best_model.pt
+pr_url: https://github.com/janosh/matbench-discovery/pull/37
+# Refreshed MPtrj ALIGNN-FF checkpoint (registered in alignn.pretrained as `mptrj_ff`)
+checkpoint_url: https://ndownloader.figshare.com/files/67163333
 
 license:
   code: MIT
@@ -47,52 +50,67 @@ license:
   checkpoint: MIT
   checkpoint_url: https://github.com/usnistgov/alignn/blob/408bb6e996/LICENSE.rst
 
-requirements:
-  alignn: 2024.5.27
-  ase: 3.22.1
-  dgl: 2.1.0
-  numpy: 1.26.4
-  pandas: 2.2.2
-  torch: 2.2.1
+environment:
+  dependencies:
+    - alignn
+    - ase
+    - numpy
+    - pandas
+    - torch
+  python_version: '3.11'
 
 openness: OSOD
+architecture_types: [gnn]
 train_task: S2EFS
 test_task: IS2RE-SR
 targets: EFS_G
-model_type: UIP
-model_params: 4_026_753
-n_estimators: 1
-trained_for_benchmark: false
-
-training_set: [MPtrj]
-training_cost: missing
+training_sets: [MPtrj]
+model_params: 547097
 
 hyperparams:
-  max_force: 0.05
-  max_steps: 500
-  ase_optimizer: FIRE
-  cell_filter: ExpCellFilter
-  graph_construction_radius: 8.0 # Å, from Methodology section in arXiv:2209.05554
-  max_neighbors: 12
+  architecture:
+    graph_construction_radius: 8.0
+    max_neighbors: 12
+  evaluation:
+    ase_optimizer: FIRE
+    cell_filter: FrechetCellFilter
+    max_steps: 500
+    max_force: 0.05
 
 notes:
   description: |
-    ALIGNN-FF is a universal interatomic potential built on the ALIGNN (Atomistic Line Graph Neural
-    Network) architecture, which jointly encodes the atom graph and its line graph (bond angles) for
-    message passing. This submission uses the default ALIGNN-FF force field bundled with the `alignn`
-    package, loaded via `alignn.ff.ff.default_path()` and exposed to ASE through
-    `AlignnAtomwiseCalculator`.
+    ALIGNN-FF is a pure-PyTorch line-graph GNN force field. This entry uses the
+    refreshed MPtrj-trained checkpoint (mptrj_smooth), relaxing the WBM initial
+    structures with FIRE + FrechetCellFilter. Formation energies use self-consistent
+    per-model elemental references over the full 256,963-structure WBM set.
 
 metrics:
-  phonons:
-    kappa_103:
-      pred_file: models/alignn_ff/2026-05-20-kappa-103-FIRE-dist=0.01-fmax=1e-4-symprec=1e-5.json.gz
-      pred_file_url: # TODO upload to Figshare/Zenodo and add direct download URL
-  geo_opt:
-    pred_file: models/alignn_ff/2026-05-20-wbm-geo-opt-FIRE.jsonl.gz
-    pred_file_url: # TODO upload to Figshare/Zenodo and add direct download URL
-    struct_col: alignn_ff_structure
+  diatomics:
+    pred_file:
+      name: models/alignn_ff/alignn-ff/2026-08-23-diatomics.json.gz
+      url: https://ndownloader.figshare.com/files/68138242
+      size: 26592
+      md5: 8d296367502d15220d11aa2dded79d84
+    tortuosity: 1.008
+    energy_diff_flips: 5.966
+    energy_jump: 4.330
   discovery:
-    pred_file: models/alignn_ff/2026-05-20-wbm-IS2RE.csv.gz
-    pred_file_url: # TODO upload to Figshare/Zenodo and add direct download URL
-    pred_col: e_form_per_atom_alignn_ff
+    pred_file:
+      name: models/alignn_ff/alignn-ff/2026-08-23-discovery.csv.gz
+      url: https://ndownloader.figshare.com/files/68138239
+      size: 1687370
+      md5: 615c10b6677ed247d82b31b66705a746
+    full_test_set:
+      F1: 0.404
+      DAF: 1.606
+      Precision: 0.268
+      Recall: 0.820
+      Accuracy: 0.596
+      TP: 35098
+      FP: 96040
+      TN: 118096
+      FN: 7726
+      MAE: 0.226
+      RMSE: 0.476
+      R2: 0.731
+      missing_preds: 3
